@@ -1,12 +1,23 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { json, urlencoded, raw } from 'express';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
+
+  // Binary upload support: parse application/octet-stream bodies for the problem upload route.
+  // NestJS's default body parsers (json, urlencoded) skip octet-stream, so this must be registered
+  // explicitly. It runs after the default parsers which leaves the stream intact for us.
+  app.use('/problem/upload', raw({ type: 'application/octet-stream', limit: '200mb' }));
+
+  // Also keep standard parsers available for json/urlencoded routes (already added by NestJS,
+  // but registering here ensures order is correct when express.raw() is in the stack).
+  app.use(json({ limit: '10mb' }));
+  app.use(urlencoded({ extended: true, limit: '10mb' }));
 
   // Global validation pipe
   app.useGlobalPipes(

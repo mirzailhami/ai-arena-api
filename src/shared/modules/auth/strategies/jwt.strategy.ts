@@ -21,7 +21,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const issuers = configService.get<string[]>('auth.validIssuers', []);
 
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        // Standard Authorization: Bearer header (used by Swagger / direct API calls)
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+        // platform-ui sends the v3 JWT in the 'sessionId' request header
+        (req: any) => (req?.headers?.['sessionid'] as string) || null,
+      ]),
       ignoreExpiration: false,
       secretOrKey: secret,
       algorithms: ['HS256', 'RS256'],

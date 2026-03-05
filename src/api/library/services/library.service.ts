@@ -48,16 +48,22 @@ export class LibraryService {
    * Uploads a new problem ZIP and initiates testing workflow.
    *
    * @param zipBuffer - Uploaded ZIP file buffer
-   * @param fileName - Original filename
+   * @param problemName - Human-readable problem name (from X-Problem-Name header)
+   * @param zipFileName - Original ZIP filename (from Content-Disposition)
    * @param userId - Uploader user ID
    * @returns Created problem record (status: Pending Test)
    */
-  async uploadProblem(zipBuffer: Buffer, fileName: string, userId: string): Promise<Problem> {
+  async uploadProblem(
+    zipBuffer: Buffer,
+    problemName: string,
+    zipFileName: string,
+    userId: string,
+  ): Promise<Problem> {
     // Create problem record
     const problem = await this.prisma.problem.create({
       data: {
-        name: fileName,
-        zipFileName: fileName,
+        name: problemName,
+        zipFileName: zipFileName,
         zipFilePath: '', // Will update after saving ZIP
         status: ProblemStatus.PendingTest,
         createdBy: userId,
@@ -69,7 +75,7 @@ export class LibraryService {
     // Save ZIP file to disk
     const zipDir = path.join(this.problemsRoot, problemId);
     await fs.mkdir(zipDir, { recursive: true });
-    const zipPath = path.join(zipDir, fileName);
+    const zipPath = path.join(zipDir, zipFileName);
     await fs.writeFile(zipPath, zipBuffer);
 
     // Update problem with ZIP path
@@ -78,7 +84,9 @@ export class LibraryService {
       data: { zipFilePath: zipPath },
     });
 
-    this.logger.log(`Problem ${problemId} uploaded: ${fileName} (${zipBuffer.length} bytes)`);
+    this.logger.log(
+      `Problem ${problemId} uploaded: ${problemName} / ${zipFileName} (${zipBuffer.length} bytes)`,
+    );
 
     return problem;
   }
@@ -242,5 +250,21 @@ export class LibraryService {
     // Delete database record
     await this.prisma.problem.delete({ where: { id: problemId } });
     this.logger.log(`Deleted problem ${problemId} from database`);
+  }
+
+  /**
+   * Manually sets the isContestReady flag for a problem.
+   * Used by the platform-UI "Flag for Contest" / "Unflag" button.
+   *
+   * @param problemId - Problem ID
+   * @param flag - true = mark contest-ready, false = unmark
+   * @returns Updated problem record
+   */
+  async setContestReady(problemId: string, flag: boolean): Promise<Problem> {
+    await this.getProblemById(problemId); // ensure exists (throws 404 if not)
+    return this.prisma.problem.update({
+      where: { id: problemId },
+      data: { isContestReady: flag },
+    });
   }
 }

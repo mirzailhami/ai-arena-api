@@ -51,16 +51,16 @@ describe('AI Arena API (e2e)', () => {
   // ── Auth guard ────────────────────────────────────────────────────────────
 
   describe('JWT Auth Guard', () => {
-    it('GET /library/problems returns 401 when no token provided', () => {
-      return request(app.getHttpServer()).get('/library/problems').expect(401);
+    it('GET /problem/list returns 401 when no token provided', () => {
+      return request(app.getHttpServer()).get('/problem/list').expect(401);
     });
 
     it('GET /tourneys returns 401 when no token provided', () => {
       return request(app.getHttpServer()).get('/tourneys').expect(401);
     });
 
-    it('POST /library/problems returns 401 when no token provided', () => {
-      return request(app.getHttpServer()).post('/library/problems').expect(401);
+    it('POST /problem/upload returns 401 when no token provided', () => {
+      return request(app.getHttpServer()).post('/problem/upload').expect(401);
     });
 
     it('POST /tourneys returns 401 when no token provided', () => {
@@ -83,8 +83,15 @@ describe('AI Arena API (e2e)', () => {
 
     it('returns 401 with malformed Bearer token', () => {
       return request(app.getHttpServer())
-        .get('/library/problems')
+        .get('/problem/list')
         .set('Authorization', 'Bearer not-a-valid-jwt')
+        .expect(401);
+    });
+
+    it('returns 401 with malformed sessionId header', () => {
+      return request(app.getHttpServer())
+        .get('/problem/list')
+        .set('sessionId', 'not-a-valid-jwt')
         .expect(401);
     });
   });

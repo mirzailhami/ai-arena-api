@@ -153,14 +153,19 @@ CORS_ORIGINS="https://local.topcoder-dev.com,http://localhost:4200"
 
 ### Library (Problem Management)
 
+> Routes match the platform-ui `arena-manager.service.ts` contract (after nginx strips the `/arena-manager/api` prefix).
+> Auth: JWT accepted in either `Authorization: Bearer` header or `sessionId` header (platform-ui default).
+> Responses: all endpoints return `{ success, data, message }` shape.
+
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `POST` | `/library/problems` | JWT | Upload problem ZIP |
-| `POST` | `/library/problems/:id/test` | JWT | Run Docker test cycle |
-| `GET` | `/library/problems/:id/log` | JWT | Get build/test logs |
-| `GET` | `/library/problems` | JWT | List all problems |
-| `GET` | `/library/problems/:id` | JWT | Get single problem |
-| `DELETE` | `/library/problems/:id` | JWT | Delete problem |
+| `POST` | `/problem/upload` | JWT | Upload ZIP (octet-stream, `X-Problem-Name` header) |
+| `POST` | `/problem/test/:id` | JWT | Run Docker test cycle |
+| `GET` | `/problem/:id/log` | JWT | Get build/test logs |
+| `GET` | `/problem/list` | JWT | List all problems |
+| `GET` | `/problem/:id` | JWT | Get single problem |
+| `DELETE` | `/problem/:id` | JWT | Delete problem (returns 200 + body) |
+| `POST` | `/problem/flag/:id` | JWT | Set/clear `isContestReady` (body: `true`/`false`) |
 
 ### Tourney (Tournament Management)
 
@@ -225,13 +230,14 @@ export JWT="eyJ..."
 The script will:
 - Test public `GET /health` → 200
 - Test auth guard with no token → 401
-- Upload a minimal test ZIP → 201
-- Trigger Docker test cycle → 200 (requires Docker daemon)
+- Upload a minimal test ZIP (binary octet-stream) → 200 with `{ data: { problemId, ... } }`
+- Trigger Docker test cycle → 200, check `success` field
 - Get build log → 200
+- Flag problem as contest-ready → 200
 - Create a tournament with a 2-round bracket → 201
 - Assign problem to contest (path param PUT) → 200
 - Delete tournament → 204 and verify 404
-- Delete problem → 204
+- Delete problem → 200
 
 > **Docker test note**: Step 4 (Docker test cycle) requires the Docker daemon to be accessible from the running process (`docker ps` must succeed). If Docker is not available, the test is reported as INFO (not a hard failure) and all other tests still run.
 
@@ -256,36 +262,46 @@ Example curl commands:
 ```bash
 export JWT="eyJ..."  # your Topcoder JWT
 
-# List problems
-curl -s http://localhost:3000/library/problems \
-  -H "Authorization: Bearer ${JWT}" | jq
+# Auth: either Authorization: Bearer OR sessionId header (platform-ui default)
+AUTH="sessionId: ${JWT}"
 
-# Upload a problem ZIP
-curl -s -X POST http://localhost:3000/library/problems \
-  -H "Authorization: Bearer ${JWT}" \
-  -F "file=@/path/to/774830.zip" | jq
+# List problems  (returns { success, data: [...], message })
+curl -s http://localhost:3000/problem/list \
+  -H "${AUTH}" | jq
+
+# Upload a problem ZIP (binary octet-stream)
+curl -s -X POST http://localhost:3000/problem/upload \
+  -H "${AUTH}" \
+  -H "Content-Type: application/octet-stream" \
+  -H "Content-Disposition: attachment; filename=\"my-problem.zip\"" \
+  -H "X-Problem-Name: My Problem" \
+  --data-binary @/path/to/problem.zip | jq
 
 # Run Docker test cycle
-curl -s -X POST http://localhost:3000/library/problems/<id>/test \
-  -H "Authorization: Bearer ${JWT}" | jq
+curl -s -X POST http://localhost:3000/problem/test/<id> \
+  -H "${AUTH}" | jq
 
 # Get build log
-curl -s http://localhost:3000/library/problems/<id>/log \
-  -H "Authorization: Bearer ${JWT}"
+curl -s http://localhost:3000/problem/<id>/log \
+  -H "${AUTH}" | jq
+
+# Flag problem as contest-ready
+curl -s -X POST http://localhost:3000/problem/flag/<id> \
+  -H "${AUTH}" -H "Content-Type: application/json" -d 'true' | jq
 
 # Create tournament
 curl -s -X POST http://localhost:3000/tourneys \
-  -H "Authorization: Bearer ${JWT}" \
+  -H "${AUTH}" \
   -H "Content-Type: application/json" \
   -d '{"name":"Test Tourney","numRounds":2,"initialEntrants":8,"maxContestantsPerMatch":4,"advancingContestants":1}' | jq
 
 # Get full bracket (copy contestId from response)
 curl -s http://localhost:3000/tourneys/<id> \
-  -H "Authorization: Bearer ${JWT}" | jq
+  -H "${AUTH}" | jq
 
 # Assign problem to contest
 curl -s -X PUT "http://localhost:3000/tourneys/<id>/rounds/1/contests/<contestId>/problems/<problemId>" \
-  -H "Authorization: Bearer ${JWT}" | jq
+  -H "${AUTH}" | jq
 
 # Delete tournament
 curl -s -X DELETE http://localhost:3000/tourneys/<id> \
