@@ -28,3 +28,6 @@ Thumbs.db
 # Internal / AI tooling
 *.prompt.md
 *.plan.md
+
+# Challenge problem ZIPs (do not commit)
+scripts/problems/*.zip

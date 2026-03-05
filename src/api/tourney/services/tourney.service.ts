@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Tournament } from '@prisma/client';
 import { PrismaService } from '@/shared/modules/global/prisma.service';
-import { CreateTourneyDto, TourneyResponseDto } from '../dto';
+import { CreateTourneyDto, TourneyResponseDto, TourneyRefResponseDto, UpdateTourneyBracketDto } from '../dto';
 import { BracketGeneratorService } from './bracket-generator.service';
 
 /**
@@ -242,5 +242,117 @@ export class TourneyService {
         })),
       })),
     };
+  }
+
+  /**
+   * Maps Prisma Tournament model to the reference-compatible response DTO.
+   * Uses tourneyId, bracketStructure.rounds, contestId, and Unix ms startDate.
+   */
+  private mapToRefResponseDto(tournament: any): TourneyRefResponseDto {
+    return {
+      tourneyId: tournament.id,
+      name: tournament.name,
+      numRounds: tournament.numRounds,
+      initialEntrants: tournament.initialEntrants,
+      maxContestantsPerMatch: tournament.maxContestantsPerMatch,
+      advancingContestants: tournament.advancingContestants,
+      startDate: tournament.startDate
+        ? new Date(tournament.startDate).getTime()
+        : Date.now(),
+      isActive: tournament.isActive,
+      bracketStructure: {
+        rounds: tournament.rounds.map((round: any) => ({
+          roundNumber: round.roundNumber,
+          roundName: round.roundName,
+          contests: round.contests.map((contest: any) => ({
+            contestId: contest.id,
+            problemId: contest.problemId ?? null,
+            entrantIds: contest.entrantIds?.length ? contest.entrantIds : null,
+            winnerId: contest.winnerId ?? null,
+          })),
+        })),
+      },
+    };
+  }
+
+  /**
+   * Creates a new tournament (reference-compatible).
+   * Same logic as createTournament but returns TourneyRefResponseDto.
+   */
+  async createTournamentRef(createDto: CreateTourneyDto, userId: string): Promise<TourneyRefResponseDto> {
+    const result = await this.createTournament(createDto, userId);
+    // Re-fetch with full include to ensure we have all data
+    const tournament = await this.prisma.tournament.findUnique({
+      where: { id: result.id },
+      include: {
+        rounds: {
+          include: { contests: true },
+          orderBy: { roundNumber: 'asc' },
+        },
+      },
+    });
+    return this.mapToRefResponseDto(tournament);
+  }
+
+  /**
+   * Updates a tournament's bracket structure (reference-compatible PUT).
+   * Iterates all contests in the payload and updates their problemId.
+   */
+  async updateTourneyBracket(
+    tournamentId: string,
+    dto: UpdateTourneyBracketDto,
+  ): Promise<TourneyRefResponseDto> {
+    const tournament = await this.prisma.tournament.findUnique({
+      where: { id: tournamentId },
+      include: {
+        rounds: {
+          include: { contests: true },
+          orderBy: { roundNumber: 'asc' },
+        },
+      },
+    });
+
+    if (!tournament) {
+      throw new NotFoundException(`Tournament ${tournamentId} not found`);
+    }
+
+    // Collect all contest updates from the payload
+    const contestUpdates: Array<{ id: string; problemId: string | null }> = [];
+
+    for (const payloadRound of dto.bracketStructure.rounds) {
+      for (const payloadContest of payloadRound.contests) {
+        contestUpdates.push({
+          id: payloadContest.contestId,
+          problemId: payloadContest.problemId ?? null,
+        });
+      }
+    }
+
+    // Apply updates in parallel
+    await Promise.all(
+      contestUpdates.map(({ id, problemId }) =>
+        this.prisma.contest.update({
+          where: { id },
+          data: { problemId: problemId ?? null },
+        }),
+      ),
+    );
+
+    this.logger.log(
+      `Updated bracket for tournament ${tournamentId}: ${contestUpdates.length} contests`,
+    );
+
+    // Return updated tournament in reference shape
+    const updated = await this.prisma.tournament.findUnique({
+      where: { id: tournamentId },
+      include: {
+        rounds: {
+          include: { contests: true },
+          orderBy: { roundNumber: 'asc' },
+        },
+      },
+    });
+
+    return this.mapToRefResponseDto(updated);
   }
 }
