@@ -387,23 +387,25 @@ pnpm run start:dev   # API on http://localhost:3000
 
 Follow the [platform-ui README](https://github.com/topcoder-platform/platform-ui) to run it locally. It will be available at `https://local.topcoder-dev.com/`.
 
-#### 4. Log in and navigate
+#### 4. Log in and extract your JWT
 
-1. Go to `https://local.topcoder-dev.com/` in your browser
-2. Log in with your **Topcoder Dev** account
-3. Navigate to the **Arena Manager** section:
-   - **Problem Library** → Upload, test, and manage problem ZIPs
-   - **Tournaments** → Create brackets, assign problems, view/delete tournaments
+1. Go to `https://local.topcoder-dev.com/` and log in with your **Topcoder Dev** account
+2. Open browser DevTools → **Application** → **Cookies** → copy the `v3jwt` cookie value
+3. Use that value as your JWT for curl commands and the smoke test script:
+   ```bash
+   export JWT="<v3jwt-cookie-value>"
+   ./scripts/smoke-test.sh
+   ```
 
-#### 5. How the JWT reaches the API
+Alternatively: DevTools → **Network** → any API request → **Request Headers** → copy the `Authorization` header value (without the `Bearer ` prefix).
 
-After login, platform-ui stores a JWT in the `v3jwt` cookie. Every API call from  
-the UI includes an `Authorization: Bearer <token>` header automatically —  
-no manual token handling required.
+#### 5. Problem Library page (Part 1 deliverable)
 
-> To extract the token for curl/smoke-test use: DevTools → **Application** →  
-> **Cookies** → `v3jwt`, or DevTools → **Network** → any API request →  
-> **Request Headers** → `Authorization`.
+The **Arena Manager → Problem Library** page in platform-ui was delivered in Part 1. If it is deployed, you can upload and test problems through the UI — every request automatically includes the JWT.
+
+> **Note**: There is no tourney UI page in the current platform-ui build. The tourney  
+> frontend is a separate deliverable submitted to the platform-ui repo. All tourney  
+> API features are tested via curl or the smoke test script.
 
 ### CORS Configuration
 
