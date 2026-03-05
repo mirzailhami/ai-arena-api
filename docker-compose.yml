@@ -35,8 +35,9 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ai_arena?schema=public
       NODE_ENV: production
       PORT: 3000
-      AUTH_SECRET: ${AUTH_SECRET:-your-secret-key-here}
-      VALID_ISSUERS: ${VALID_ISSUERS:-https://topcoder-dev.auth0.com/,https://topcoder.auth0.com/}
+      JWKS_URI: ${JWKS_URI:-https://auth.topcoder-dev.com/.well-known/jwks.json}
+      VALID_ISSUERS: ${VALID_ISSUERS:-https://auth.topcoder-dev.com/}
+      AUTH_SECRET: ""
       PROBLEMS_ROOT: /app/problems
       ARENA_SYNTHETICA_WAR_PATH: /app/assets/synthetica2.war
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:4200,http://localhost:3000}
