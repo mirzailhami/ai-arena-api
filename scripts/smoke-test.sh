@@ -230,8 +230,8 @@ TOURNEY_HTTP=$(echo "${TOURNEY_RESP}" | tail -1)
 TOURNEY_BODY=$(echo "${TOURNEY_RESP}" | head -n -1)
 
 if [[ "$TOURNEY_HTTP" == "201" ]]; then
-  TOURNEY_ID=$(echo "${TOURNEY_BODY}" | jq -r '.id // empty')
-  ROUND_COUNT=$(echo "${TOURNEY_BODY}" | jq '.rounds | length')
+  TOURNEY_ID=$(echo "${TOURNEY_BODY}" | jq -r '.data.id // empty')
+  ROUND_COUNT=$(echo "${TOURNEY_BODY}" | jq '.data.rounds | length')
   pass "POST /tourneys → 201  |  id: ${TOURNEY_ID}  |  rounds: ${ROUND_COUNT}"
 else
   fail "POST /tourneys → expected 201, got ${TOURNEY_HTTP}  |  body: ${TOURNEY_BODY}"
@@ -253,7 +253,7 @@ fi
 if [[ -n "${TOURNEY_ID:-}" && -n "${PROBLEM_ID:-}" ]]; then
   info "13. PUT /tourneys/:id/rounds/1/contests/:contestId/problems/:problemId"
   TOURNEY_DATA=$(curl -s -H "${AUTH_HEADER}" "${BASE_URL}/tourneys/${TOURNEY_ID}")
-  CONTEST_ID=$(echo "${TOURNEY_DATA}" | jq -r '.rounds[0].contests[0].id // empty')
+  CONTEST_ID=$(echo "${TOURNEY_DATA}" | jq -r '.data.rounds[0].contests[0].id // empty')
 
   if [[ -n "${CONTEST_ID:-}" ]]; then
     STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
