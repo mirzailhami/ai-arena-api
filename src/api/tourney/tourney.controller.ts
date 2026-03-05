@@ -23,6 +23,7 @@ import { CurrentUser } from '@/shared/modules/auth';
 import { JwtPayloadDto } from '@/shared/modules/auth/dto/jwt-payload.dto';
 import { CreateTourneyDto, TourneyResponseDto } from './dto';
 import { TourneyService } from './services';
+import { ResponseObject, okResponse } from '@/shared/dto/response-object';
 
 /**
  * Controller for Tournament management.
@@ -60,10 +61,10 @@ export class TourneyController {
   async createTournament(
     @Body() createDto: CreateTourneyDto,
     @CurrentUser() user: JwtPayloadDto,
-  ): Promise<TourneyResponseDto> {
+  ): Promise<ResponseObject<TourneyResponseDto>> {
     this.logger.log(`User ${user.handle} (${user.sub}) creating tournament: ${createDto.name}`);
-
-    return this.tourneyService.createTournament(createDto, user.sub);
+    const result = await this.tourneyService.createTournament(createDto, user.sub);
+    return okResponse(result, 'Tournament created successfully');
   }
 
   /**
@@ -78,8 +79,9 @@ export class TourneyController {
     type: [TourneyResponseDto],
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getAllTournaments(): Promise<TourneyResponseDto[]> {
-    return this.tourneyService.getAllTournaments();
+  async getAllTournaments(): Promise<ResponseObject<TourneyResponseDto[]>> {
+    const result = await this.tourneyService.getAllTournaments();
+    return okResponse(result);
   }
 
   /**
@@ -96,8 +98,9 @@ export class TourneyController {
   })
   @ApiResponse({ status: 404, description: 'Tournament not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getTournamentById(@Param('id') id: string): Promise<TourneyResponseDto> {
-    return this.tourneyService.getTournamentById(id);
+  async getTournamentById(@Param('id') id: string): Promise<ResponseObject<TourneyResponseDto>> {
+    const result = await this.tourneyService.getTournamentById(id);
+    return okResponse(result);
   }
 
   /**
@@ -126,12 +129,13 @@ export class TourneyController {
     @Param('contestId') contestId: string,
     @Param('problemId') problemId: string,
     @CurrentUser() user: JwtPayloadDto,
-  ): Promise<TourneyResponseDto> {
+  ): Promise<ResponseObject<TourneyResponseDto>> {
     this.logger.log(
       `User ${user.handle} (${user.sub}) assigning problem ${problemId} to tournament ${id} round ${roundNumber} contest ${contestId}`,
     );
 
-    return this.tourneyService.assignProblem(id, roundNumber, contestId, problemId);
+    const result = await this.tourneyService.assignProblem(id, roundNumber, contestId, problemId);
+    return okResponse(result, 'Problem assigned successfully');
   }
 
   /**
