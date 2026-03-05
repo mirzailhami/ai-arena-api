@@ -43,7 +43,7 @@ FAILURES=0
 # ── JWT token ────────────────────────────────────────────────────────────────
 if [[ -z "${JWT:-}" ]]; then
   echo ""
-  echo "Paste your Topcoder JWT token (from platform-ui DevTools → Application → Cookies → 'v3jwt'):"
+  echo "Paste your Topcoder JWT token (from platform-ui DevTools → Application → Cookies → 'tcjwt'):"
   read -r JWT
 fi
 

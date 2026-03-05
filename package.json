@@ -16,7 +16,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
-    "test:e2e": "jest --config jest-e2e.config.js --forceExit",
+    "test:e2e": "jest --config test/jest-e2e.json --forceExit",
     "test:smoke": "bash ./scripts/smoke-test.sh",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
