@@ -13,8 +13,13 @@
 #   GET/POST/DELETE /tourneys
 #
 # Usage:
-#   ./scripts/smoke-test.sh                        # runs against http://localhost:3000
-#   ./scripts/smoke-test.sh http://localhost:3000
+#   ./scripts/smoke-test.sh                               # runs against http://localhost:3000, synthetic ZIP
+#   ./scripts/smoke-test.sh http://localhost:3000         # explicit URL, synthetic ZIP
+#   ./scripts/smoke-test.sh http://localhost:3000 /path/to/774830.zip  # real problem ZIP
+#
+# Challenge problem ZIPs (774830.zip, 774930.zip, 775021.zip):
+#   Pass the path to any of these as the second argument to use a real problem
+#   instead of the synthetic test ZIP.  The ZIP filename becomes the problem name.
 #
 # Requirements:
 #   - curl
@@ -31,6 +36,9 @@
 set -euo pipefail
 
 BASE_URL="${1:-http://localhost:3000}"
+# Optional: path to a real problem ZIP (e.g. 774830.zip, 774930.zip, 775021.zip)
+# Usage: ./scripts/smoke-test.sh http://localhost:3000 /path/to/774830.zip
+PROBLEM_ZIP_PATH="${2:-}"
 
 # ── colours ─────────────────────────────────────────────────────────────────
 GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[1;33m'; NC='\033[0m'
@@ -88,22 +96,32 @@ fi
 # ── 4. Upload a problem ZIP (binary octet-stream) ────────────────────────────
 info "4. POST /problem/upload — binary octet-stream with X-Problem-Name header"
 
-TMP_DIR=$(mktemp -d)
-TMP_ZIP="${TMP_DIR}/test-problem.zip"
-mkdir -p "${TMP_DIR}/problem"
-cat > "${TMP_DIR}/problem/Dockerfile" << 'EOF'
+if [[ -n "${PROBLEM_ZIP_PATH}" && -f "${PROBLEM_ZIP_PATH}" ]]; then
+  # Use the provided real problem ZIP
+  TMP_ZIP="${PROBLEM_ZIP_PATH}"
+  PROBLEM_NAME="$(basename "${PROBLEM_ZIP_PATH}" .zip)"
+  info "   Using real problem ZIP: ${TMP_ZIP}"
+  CLEANUP_ZIP=false
+else
+  # Synthesise a minimal valid ZIP on the fly
+  TMP_DIR=$(mktemp -d)
+  TMP_ZIP="${TMP_DIR}/test-problem.zip"
+  PROBLEM_NAME="Smoke Test Problem"
+  mkdir -p "${TMP_DIR}/problem"
+  cat > "${TMP_DIR}/problem/Dockerfile" << 'EOF'
 FROM alpine:3.18
 CMD ["echo", "arena problem test passed"]
 EOF
-
-(cd "${TMP_DIR}" && zip -r test-problem.zip problem/ -x "*.DS_Store") > /dev/null 2>&1
+  (cd "${TMP_DIR}" && zip -r test-problem.zip problem/ -x "*.DS_Store") > /dev/null 2>&1
+  CLEANUP_ZIP=true
+fi
 
 UPLOAD_RESP=$(curl -s -w "\n%{http_code}" \
   -X POST \
   -H "${AUTH_HEADER}" \
   -H "Content-Type: application/octet-stream" \
   -H "Content-Disposition: attachment; filename=\"test-problem.zip\"" \
-  -H "X-Problem-Name: Smoke Test Problem" \
+  -H "X-Problem-Name: ${PROBLEM_NAME}" \
   --data-binary "@${TMP_ZIP}" \
   "${BASE_URL}/problem/upload")
 UPLOAD_HTTP=$(echo "${UPLOAD_RESP}" | tail -1)
@@ -117,7 +135,9 @@ else
   PROBLEM_ID=""
 fi
 
-rm -rf "${TMP_DIR}"
+if [[ "${CLEANUP_ZIP:-false}" == "true" ]]; then
+  rm -rf "${TMP_DIR}"
+fi
 
 # ── 5. Get single problem ─────────────────────────────────────────────────────
 if [[ -n "${PROBLEM_ID:-}" ]]; then
