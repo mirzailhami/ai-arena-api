@@ -11,6 +11,7 @@ Built with **NestJS 10**, **TypeScript 5**, **Prisma 7**, and **PostgreSQL**.
 ### Problem Library Management
 - **Upload & Test**: Upload ZIP files containing AI problems, validate structure, merge with arena base Dockerfile, and run Docker build/test cycles
 - **Status Tracking**: Problems track status through lifecycle: `Pending Test` → `Testing` → `Passed`/`Failed`
+- **Contest Readiness**: `isContestReady` is set to `true` automatically when a problem passes its Docker test. Per [forum clarification](https://discussions.topcoder.com/discussion/38253/n-x-y-z-values), this flag is "once validated, always validated" — a later failed re-test does **not** revoke it.
 - **Build Logs**: Full Docker build and runtime logs stored per problem
 - **CRUD Operations**: List, retrieve, and delete problems
 
@@ -454,7 +455,7 @@ ai-arena-api/
 
 **Problem** (problems):
 - `id` (UUID), `name`, `description`, `status`, `zipFilePath`, `buildLog`
-- `isTested`, `isContestReady`, `createdAt`, `updatedAt`, `createdBy`
+- `isTested`, `isContestReady` (set `true` on first pass, never reverted), `createdAt`, `updatedAt`, `createdBy`
 
 **Tournament** (tournaments):
 - `id` (UUID), `name`, `numRounds`, `initialEntrants`, `maxContestantsPerMatch`
