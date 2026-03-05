@@ -35,7 +35,7 @@ async function bootstrap() {
   const corsOrigins = configService.get<string>('CORS_ORIGINS', '').split(',').filter(Boolean);
   app.enableCors({
     origin: corsOrigins.length > 0 ? corsOrigins : '*',
-    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'sessionId', 'X-Problem-Name', 'Content-Disposition'],
   });
 
   // Swagger API documentation
