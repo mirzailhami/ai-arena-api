@@ -127,12 +127,12 @@ PORT=3000
 AUTH_SECRET="your-secret-key-here"
 VALID_ISSUERS="https://topcoder-dev.auth0.com/,https://topcoder.auth0.com/"
 
-# File Storage
-PROBLEMS_ROOT="/workspaces/ai-arena-api/problems"
-ARENA_SYNTHETICA_WAR_PATH="/workspaces/ai-arena-api/assets/synthetica2.war"
+# File Storage — relative paths work; adjust to any directory on your machine
+PROBLEMS_ROOT="./data/problems"
+ARENA_SYNTHETICA_WAR_PATH=""   # optional: absolute path to synthetica2.war
 
 # CORS (for platform-ui integration)
-CORS_ORIGINS="http://localhost:4200,http://localhost:3000,https://local.topcoder-dev.com"
+CORS_ORIGINS="https://local.topcoder-dev.com,http://localhost:4200"
 ```
 
 ### Key Paths
@@ -207,30 +207,90 @@ pnpm prisma migrate dev   # Create/apply migrations
 pnpm prisma studio        # Open Prisma Studio (DB GUI)
 ```
 
-### Testing Problem Upload
+### Smoke Testing
 
-1. Create a test problem ZIP with:
-   - `Dockerfile` (can be in root or subdirectory)
-   - Source code file (e.g., `solution.cpp`, `Solution.java`)
+A self-contained smoke test script covers all endpoints automatically.
 
-2. Upload via Swagger UI or curl:
-   ```bash
-   curl -X POST http://localhost:3000/library/problems \
-     -H "Authorization: Bearer <jwt-token>" \
-     -F "file=@problem.zip"
-   ```
+**Requirements**: `curl`, `jq`, and a valid Topcoder JWT token (see [Getting a JWT token](#getting-a-jwt-token)).
 
-3. Trigger test:
-   ```bash
-   curl -X POST http://localhost:3000/library/problems/<problem-id>/test \
-     -H "Authorization: Bearer <jwt-token>"
-   ```
+```bash
+# Run all smoke tests (will prompt for JWT if not set)
+JWT="eyJ..." ./scripts/smoke-test.sh
 
-4. Check logs:
-   ```bash
-   curl http://localhost:3000/library/problems/<problem-id>/log \
-     -H "Authorization: Bearer <jwt-token>"
-   ```
+# Or export once and reuse
+export JWT="eyJ..."
+./scripts/smoke-test.sh
+```
+
+The script will:
+- Test public `GET /health` → 200
+- Test auth guard with no token → 401
+- Upload a minimal test ZIP → 201
+- Trigger Docker test cycle → 200 (requires Docker daemon)
+- Get build log → 200
+- Create a tournament with a 2-round bracket → 201
+- Assign problem to contest (path param PUT) → 200
+- Delete tournament → 204 and verify 404
+- Delete problem → 204
+
+> **Docker test note**: Step 4 (Docker test cycle) requires the Docker daemon to be accessible from the running process (`docker ps` must succeed). If Docker is not available, the test is reported as INFO (not a hard failure) and all other tests still run.
+
+#### Getting a JWT token
+
+1. Deploy platform-ui locally (see [Platform-UI Integration](#platform-ui-integration))
+2. Log in at `https://local.topcoder-dev.com/` with your Topcoder Dev account
+3. Open browser DevTools → **Application** → **Cookies** → copy the `v3jwt` cookie value
+
+Or use `Authorization` header from any authenticated platform-ui network request (DevTools → **Network** tab → any API call → **Request Headers** → `Authorization`).
+
+### Manual API Testing
+
+Use the built-in Swagger UI to test any endpoint interactively:
+
+1. Open **http://localhost:3000/api** in your browser
+2. Click **Authorize** (top right), enter `Bearer <your-jwt-token>`
+3. Expand any endpoint and click **Try it out**
+
+Example curl commands:
+
+```bash
+export JWT="eyJ..."  # your Topcoder JWT
+
+# List problems
+curl -s http://localhost:3000/library/problems \
+  -H "Authorization: Bearer ${JWT}" | jq
+
+# Upload a problem ZIP
+curl -s -X POST http://localhost:3000/library/problems \
+  -H "Authorization: Bearer ${JWT}" \
+  -F "file=@/path/to/774830.zip" | jq
+
+# Run Docker test cycle
+curl -s -X POST http://localhost:3000/library/problems/<id>/test \
+  -H "Authorization: Bearer ${JWT}" | jq
+
+# Get build log
+curl -s http://localhost:3000/library/problems/<id>/log \
+  -H "Authorization: Bearer ${JWT}"
+
+# Create tournament
+curl -s -X POST http://localhost:3000/tourneys \
+  -H "Authorization: Bearer ${JWT}" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test Tourney","numRounds":2,"initialEntrants":8,"maxContestantsPerMatch":4,"advancingContestants":1}' | jq
+
+# Get full bracket (copy contestId from response)
+curl -s http://localhost:3000/tourneys/<id> \
+  -H "Authorization: Bearer ${JWT}" | jq
+
+# Assign problem to contest
+curl -s -X PUT "http://localhost:3000/tourneys/<id>/rounds/1/contests/<contestId>/problems/<problemId>" \
+  -H "Authorization: Bearer ${JWT}" | jq
+
+# Delete tournament
+curl -s -X DELETE http://localhost:3000/tourneys/<id> \
+  -H "Authorization: Bearer ${JWT}" -w "%{http_code}"
+```
 
 ---
 
@@ -305,24 +365,53 @@ CORS_ORIGINS="https://platform-ui.topcoder.com"
 
 ## Platform-UI Integration
 
-This API is designed to work with Topcoder platform-ui for frontend.
+This API is designed to work with the Topcoder [platform-ui](https://github.com/topcoder-platform/platform-ui) frontend.
 
 ### Local Development Setup
 
-1. **Host Configuration**: Add to `/etc/hosts`:
-   ```
-   127.0.0.1 local.topcoder-dev.com
-   ```
+#### 1. Add hosts entry
 
-2. **CORS**: Ensure `CORS_ORIGINS` includes platform-ui URL:
-   ```bash
-   CORS_ORIGINS="https://local.topcoder-dev.com,http://localhost:4200"
-   ```
+On your local machine (not inside Docker), add to `/etc/hosts`:
+```
+127.0.0.1 local.topcoder-dev.com
+```
 
-3. **Authentication Flow**:
-   - User logs in via platform-ui → receives JWT from Topcoder Auth0
-   - Platform-ui sends JWT in `Authorization: Bearer <token>` header
-   - API validates JWT and extracts user info
+#### 2. Start this API
+
+```bash
+docker-compose up -d postgres
+pnpm run start:dev   # API on http://localhost:3000
+```
+
+#### 3. Deploy platform-ui
+
+Follow the [platform-ui README](https://github.com/topcoder-platform/platform-ui) to run it locally. It will be available at `https://local.topcoder-dev.com/`.
+
+#### 4. Log in and navigate
+
+1. Go to `https://local.topcoder-dev.com/` in your browser
+2. Log in with your **Topcoder Dev** account
+3. Navigate to the **Arena Manager** section:
+   - **Problem Library** → Upload, test, and manage problem ZIPs
+   - **Tournaments** → Create brackets, assign problems, view/delete tournaments
+
+#### 5. How the JWT reaches the API
+
+After login, platform-ui stores a JWT in the `v3jwt` cookie. Every API call from  
+the UI includes an `Authorization: Bearer <token>` header automatically —  
+no manual token handling required.
+
+> To extract the token for curl/smoke-test use: DevTools → **Application** →  
+> **Cookies** → `v3jwt`, or DevTools → **Network** → any API request →  
+> **Request Headers** → `Authorization`.
+
+### CORS Configuration
+
+Ensure `CORS_ORIGINS` in `.env` includes the platform-ui origin:
+
+```bash
+CORS_ORIGINS="https://local.topcoder-dev.com,http://localhost:4200"
+```
 
 ---
 
