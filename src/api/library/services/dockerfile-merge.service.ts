@@ -57,8 +57,8 @@ export class DockerfileMergeService {
 
       return finalDockerfilePath;
     } catch (error) {
-      this.logger.error(`Failed to merge Dockerfile: ${error.message}`);
-      throw new Error(`Dockerfile merge failed: ${error.message}`);
+      this.logger.error(`Failed to merge Dockerfile: ${(error as Error).message}`);
+      throw new Error(`Dockerfile merge failed: ${(error as Error).message}`);
     }
   }
 

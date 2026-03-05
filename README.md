@@ -154,23 +154,23 @@ CORS_ORIGINS="http://localhost:4200,http://localhost:3000,https://local.topcoder
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `POST` | `/library/upload` | JWT | Upload problem ZIP |
-| `POST` | `/library/:id/test` | JWT | Run Docker test cycle |
-| `GET` | `/library/:id/log` | JWT | Get build/test logs |
-| `GET` | `/library` | JWT | List all problems |
-| `GET` | `/library/:id` | JWT | Get single problem |
-| `DELETE` | `/library/:id` | JWT | Delete problem |
-| `POST` | `/library/:id/flag` | JWT | Flag for re-test |
+| `POST` | `/library/problems` | JWT | Upload problem ZIP |
+| `POST` | `/library/problems/:id/test` | JWT | Run Docker test cycle |
+| `GET` | `/library/problems/:id/log` | JWT | Get build/test logs |
+| `GET` | `/library/problems` | JWT | List all problems |
+| `GET` | `/library/problems/:id` | JWT | Get single problem |
+| `DELETE` | `/library/problems/:id` | JWT | Delete problem |
+| `POST` | `/library/problems/:id/flag` | JWT | Flag for re-test |
 
 ### Tourney (Tournament Management)
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `POST` | `/tourney` | JWT | Create tournament with bracket |
-| `GET` | `/tourney` | JWT | List all tournaments |
-| `GET` | `/tourney/:id` | JWT | Get tournament + full bracket |
-| `PUT` | `/tourney/:id/problem` | JWT | Assign problem to contest |
-| `DELETE` | `/tourney/:id` | JWT | Delete tournament |
+| `POST` | `/tourneys` | JWT | Create tournament with bracket |
+| `GET` | `/tourneys` | JWT | List all tournaments |
+| `GET` | `/tourneys/:id` | JWT | Get tournament + full bracket |
+| `PUT` | `/tourneys/:id/rounds/:roundNumber/contests/:contestId/problems/:problemId` | JWT | Assign problem to contest |
+| `DELETE` | `/tourneys/:id` | JWT | Delete tournament |
 
 ### Swagger Documentation
 
@@ -215,20 +215,20 @@ pnpm prisma studio        # Open Prisma Studio (DB GUI)
 
 2. Upload via Swagger UI or curl:
    ```bash
-   curl -X POST http://localhost:3000/library/upload \
+   curl -X POST http://localhost:3000/library/problems \
      -H "Authorization: Bearer <jwt-token>" \
      -F "file=@problem.zip"
    ```
 
 3. Trigger test:
    ```bash
-   curl -X POST http://localhost:3000/library/<problem-id>/test \
+   curl -X POST http://localhost:3000/library/problems/<problem-id>/test \
      -H "Authorization: Bearer <jwt-token>"
    ```
 
 4. Check logs:
    ```bash
-   curl http://localhost:3000/library/<problem-id>/log \
+   curl http://localhost:3000/library/problems/<problem-id>/log \
      -H "Authorization: Bearer <jwt-token>"
    ```
 

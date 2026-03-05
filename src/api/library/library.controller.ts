@@ -35,23 +35,27 @@ import { LibraryService } from './services';
  */
 @ApiTags('library')
 @ApiBearerAuth()
-@Controller('library')
+@Controller('library/problems')
 export class LibraryController {
   private readonly logger = new Logger(LibraryController.name);
 
   constructor(private libraryService: LibraryService) {}
 
   /**
-   * POST /library/upload
+   * POST /library/problems
    * Uploads a new problem ZIP file to the library.
    *
    * TODO: Restrict to admin/copilot role (add role guard)
    */
-  @Post('upload')
+  @Post()
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Upload a new problem ZIP file' })
   @ApiConsumes('multipart/form-data')
-  @ApiResponse({ status: 201, description: 'Problem uploaded successfully', type: ProblemResponseDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Problem uploaded successfully',
+    type: ProblemResponseDto,
+  })
   @ApiResponse({ status: 400, description: 'Invalid file or missing file' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async uploadProblem(
@@ -152,10 +156,7 @@ export class LibraryController {
   @ApiResponse({ status: 204, description: 'Problem deleted successfully' })
   @ApiResponse({ status: 404, description: 'Problem not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async deleteProblem(
-    @Param('id') id: string,
-    @CurrentUser() user: JwtPayloadDto,
-  ): Promise<void> {
+  async deleteProblem(@Param('id') id: string, @CurrentUser() user: JwtPayloadDto): Promise<void> {
     this.logger.log(`User ${user.handle} (${user.sub}) deleting problem ${id}`);
     await this.libraryService.deleteProblem(id);
   }

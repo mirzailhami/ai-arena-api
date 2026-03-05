@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
+  ParseIntPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -20,7 +21,7 @@ import {
 } from '@nestjs/swagger';
 import { CurrentUser } from '@/shared/modules/auth';
 import { JwtPayloadDto } from '@/shared/modules/auth/dto/jwt-payload.dto';
-import { AssignProblemDto, CreateTourneyDto, TourneyResponseDto } from './dto';
+import { CreateTourneyDto, TourneyResponseDto } from './dto';
 import { TourneyService } from './services';
 
 /**
@@ -32,9 +33,9 @@ import { TourneyService } from './services';
  * All endpoints require JWT authentication (verified via global JwtAuthGuard).
  * TODO: Add role-based guards to restrict certain operations to admin/copilot roles.
  */
-@ApiTags('tourney')
+@ApiTags('tourneys')
 @ApiBearerAuth()
-@Controller('tourney')
+@Controller('tourneys')
 export class TourneyController {
   private readonly logger = new Logger(TourneyController.name);
 
@@ -60,9 +61,7 @@ export class TourneyController {
     @Body() createDto: CreateTourneyDto,
     @CurrentUser() user: JwtPayloadDto,
   ): Promise<TourneyResponseDto> {
-    this.logger.log(
-      `User ${user.handle} (${user.sub}) creating tournament: ${createDto.name}`,
-    );
+    this.logger.log(`User ${user.handle} (${user.sub}) creating tournament: ${createDto.name}`);
 
     return this.tourneyService.createTournament(createDto, user.sub);
   }
@@ -102,33 +101,37 @@ export class TourneyController {
   }
 
   /**
-   * PUT /tourney/:id/problem
+   * PUT /tourneys/:id/rounds/:roundNumber/contests/:contestId/problems/:problemId
    * Assigns a problem to a specific contest in a tournament.
    *
    * TODO: Restrict to admin/copilot role (add role guard)
    */
-  @Put(':id/problem')
+  @Put(':id/rounds/:roundNumber/contests/:contestId/problems/:problemId')
   @ApiOperation({ summary: 'Assign a problem to a contest in a tournament' })
   @ApiParam({ name: 'id', description: 'Tournament ID (UUID)', type: String })
-  @ApiBody({ type: AssignProblemDto })
+  @ApiParam({ name: 'roundNumber', description: 'Round number (1-based integer)', type: Number })
+  @ApiParam({ name: 'contestId', description: 'Contest ID (UUID)', type: String })
+  @ApiParam({ name: 'problemId', description: 'Problem ID (UUID)', type: String })
   @ApiResponse({
     status: 200,
     description: 'Problem assigned successfully',
     type: TourneyResponseDto,
   })
-  @ApiResponse({ status: 400, description: 'Invalid round/contest index or problem ID' })
-  @ApiResponse({ status: 404, description: 'Tournament or problem not found' })
+  @ApiResponse({ status: 400, description: 'Invalid round number or contest ID' })
+  @ApiResponse({ status: 404, description: 'Tournament, contest, or problem not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async assignProblem(
     @Param('id') id: string,
-    @Body() assignDto: AssignProblemDto,
+    @Param('roundNumber', ParseIntPipe) roundNumber: number,
+    @Param('contestId') contestId: string,
+    @Param('problemId') problemId: string,
     @CurrentUser() user: JwtPayloadDto,
   ): Promise<TourneyResponseDto> {
     this.logger.log(
-      `User ${user.handle} (${user.sub}) assigning problem ${assignDto.problemId} to tournament ${id}`,
+      `User ${user.handle} (${user.sub}) assigning problem ${problemId} to tournament ${id} round ${roundNumber} contest ${contestId}`,
     );
 
-    return this.tourneyService.assignProblem(id, assignDto);
+    return this.tourneyService.assignProblem(id, roundNumber, contestId, problemId);
   }
 
   /**

@@ -184,7 +184,7 @@ export class DockerTestService {
     return new Promise((resolve) => {
       let stdout = '';
       let stderr = '';
-      let containerId = '';
+      const containerId = '';
       let timedOut = false;
 
       const proc = spawn('docker', ['run', '--name', containerName, '--rm', imageName]);
@@ -227,12 +227,7 @@ export class DockerTestService {
    */
   private async dockerInspectExitCode(containerId: string): Promise<number> {
     return new Promise((resolve) => {
-      const proc = spawn('docker', [
-        'inspect',
-        '--format',
-        '{{.State.ExitCode}}',
-        containerId,
-      ]);
+      const proc = spawn('docker', ['inspect', '--format', '{{.State.ExitCode}}', containerId]);
 
       let output = '';
 

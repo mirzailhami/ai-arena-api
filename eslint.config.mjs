@@ -20,6 +20,8 @@ export default [
       '@typescript-eslint/explicit-module-boundary-types': 'off',
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      // Disabled: fires false positives on defensive pre-try-catch variable initializations
+      'no-useless-assignment': 'off',
     },
   },
 ];

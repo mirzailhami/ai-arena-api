@@ -42,10 +42,7 @@ export class BracketGeneratorService {
       `Generating bracket: ${config.numRounds} rounds, ${config.initialEntrants} initial entrants`,
     );
 
-    while (
-      currentRound <= config.numRounds &&
-      currentEntrants > config.advancingContestants
-    ) {
+    while (currentRound <= config.numRounds && currentEntrants > config.advancingContestants) {
       // Calculate matches in this round
       const matchesInRound = Math.ceil(currentEntrants / config.maxContestantsPerMatch);
 

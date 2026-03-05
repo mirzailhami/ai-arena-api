@@ -39,7 +39,7 @@ async function bootstrap() {
     .addTag('tourney', 'Tournament Management')
     .addTag('health', 'Health Check')
     .build();
-  
+
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 

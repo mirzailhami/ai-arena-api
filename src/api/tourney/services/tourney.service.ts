@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Tournament } from '@prisma/client';
 import { PrismaService } from '@/shared/modules/global/prisma.service';
-import { AssignProblemDto, CreateTourneyDto, TourneyResponseDto } from '../dto';
+import { CreateTourneyDto, TourneyResponseDto } from '../dto';
 import { BracketGeneratorService } from './bracket-generator.service';
 
 /**
@@ -30,10 +30,7 @@ export class TourneyService {
    * @param userId - User creating the tournament
    * @returns Created tournament with full bracket
    */
-  async createTournament(
-    createDto: CreateTourneyDto,
-    userId: string,
-  ): Promise<TourneyResponseDto> {
+  async createTournament(createDto: CreateTourneyDto, userId: string): Promise<TourneyResponseDto> {
     this.logger.log(`Creating tournament: ${createDto.name}`);
 
     // 1. Generate bracket structure (rounds + contests)
@@ -140,7 +137,9 @@ export class TourneyService {
    */
   async assignProblem(
     tournamentId: string,
-    assignDto: AssignProblemDto,
+    roundNumber: number,
+    contestId: string,
+    problemId: string,
   ): Promise<TourneyResponseDto> {
     const tournament = await this.prisma.tournament.findUnique({
       where: { id: tournamentId },
@@ -160,38 +159,34 @@ export class TourneyService {
       throw new NotFoundException(`Tournament ${tournamentId} not found`);
     }
 
-    // Find the target round
-    const round = tournament.rounds.find((r) => r.roundNumber === assignDto.roundNumber);
+    // Validate the round exists
+    const round = tournament.rounds.find((r) => r.roundNumber === roundNumber);
     if (!round) {
-      throw new BadRequestException(
-        `Round ${assignDto.roundNumber} not found in tournament ${tournamentId}`,
-      );
+      throw new BadRequestException(`Round ${roundNumber} not found in tournament ${tournamentId}`);
     }
 
-    // Find the target contest
-    const contest = round.contests[assignDto.contestIndex];
+    // Find the target contest by UUID within that round
+    const contest = round.contests.find((c) => c.id === contestId);
     if (!contest) {
-      throw new BadRequestException(
-        `Contest index ${assignDto.contestIndex} not found in round ${assignDto.roundNumber}`,
-      );
+      throw new NotFoundException(`Contest ${contestId} not found in round ${roundNumber}`);
     }
 
     // Verify problem exists
     const problem = await this.prisma.problem.findUnique({
-      where: { id: assignDto.problemId },
+      where: { id: problemId },
     });
     if (!problem) {
-      throw new NotFoundException(`Problem ${assignDto.problemId} not found`);
+      throw new NotFoundException(`Problem ${problemId} not found`);
     }
 
     // Update contest with problem ID
     await this.prisma.contest.update({
       where: { id: contest.id },
-      data: { problemId: assignDto.problemId },
+      data: { problemId },
     });
 
     this.logger.log(
-      `Assigned problem ${assignDto.problemId} to tournament ${tournamentId} round ${assignDto.roundNumber} contest ${assignDto.contestIndex}`,
+      `Assigned problem ${problemId} to tournament ${tournamentId} round ${roundNumber} contest ${contestId}`,
     );
 
     // Return updated tournament
