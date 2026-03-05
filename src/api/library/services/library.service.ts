@@ -241,19 +241,4 @@ export class LibraryService {
     await this.prisma.problem.delete({ where: { id: problemId } });
     this.logger.log(`Deleted problem ${problemId} from database`);
   }
-
-  /**
-   * Flags a problem for re-testing (resets status to Pending Test).
-   *
-   * @param problemId - Problem ID to flag
-   * @returns Updated problem record
-   */
-  async flagForRetest(problemId: string): Promise<Problem> {
-    const problem = await this.getProblemById(problemId);
-
-    return this.prisma.problem.update({
-      where: { id: problemId },
-      data: { status: ProblemStatus.PendingTest },
-    });
-  }
 }

@@ -160,27 +160,4 @@ export class LibraryController {
     this.logger.log(`User ${user.handle} (${user.sub}) deleting problem ${id}`);
     await this.libraryService.deleteProblem(id);
   }
-
-  /**
-   * POST /library/:id/flag
-   * Flags a problem for re-testing (resets status to Pending Test).
-   *
-   * TODO: Restrict to admin/copilot role (add role guard)
-   */
-  @Post(':id/flag')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Flag a problem for re-testing' })
-  @ApiParam({ name: 'id', description: 'Problem ID (UUID)', type: String })
-  @ApiResponse({ status: 200, description: 'Problem flagged for retest', type: ProblemResponseDto })
-  @ApiResponse({ status: 404, description: 'Problem not found' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async flagForRetest(
-    @Param('id') id: string,
-    @CurrentUser() user: JwtPayloadDto,
-  ): Promise<ProblemResponseDto> {
-    this.logger.log(`User ${user.handle} (${user.sub}) flagging problem ${id} for retest`);
-
-    const problem = await this.libraryService.flagForRetest(id);
-    return problem as ProblemResponseDto;
-  }
 }

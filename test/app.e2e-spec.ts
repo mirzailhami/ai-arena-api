@@ -27,9 +27,7 @@ describe('AI Arena API (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
-    );
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
     await app.init();
   });
 
@@ -77,7 +75,9 @@ describe('AI Arena API (e2e)', () => {
 
     it('PUT assign problem returns 401 when no token provided', () => {
       return request(app.getHttpServer())
-        .put('/tourneys/00000000-0000-0000-0000-000000000000/rounds/1/contests/00000000-0000-0000-0000-000000000001/problems/00000000-0000-0000-0000-000000000002')
+        .put(
+          '/tourneys/00000000-0000-0000-0000-000000000000/rounds/1/contests/00000000-0000-0000-0000-000000000001/problems/00000000-0000-0000-0000-000000000002',
+        )
         .expect(401);
     });
 

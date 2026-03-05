@@ -12,7 +12,7 @@ Built with **NestJS 10**, **TypeScript 5**, **Prisma 7**, and **PostgreSQL**.
 - **Upload & Test**: Upload ZIP files containing AI problems, validate structure, merge with arena base Dockerfile, and run Docker build/test cycles
 - **Status Tracking**: Problems track status through lifecycle: `Pending Test` → `Testing` → `Passed`/`Failed`
 - **Build Logs**: Full Docker build and runtime logs stored per problem
-- **CRUD Operations**: List, retrieve, delete, and flag problems for re-testing
+- **CRUD Operations**: List, retrieve, and delete problems
 
 ### Tournament Bracket Generation
 - **Auto-Generation**: Create elimination-style tournament brackets with configurable parameters
@@ -160,7 +160,6 @@ CORS_ORIGINS="https://local.topcoder-dev.com,http://localhost:4200"
 | `GET` | `/library/problems` | JWT | List all problems |
 | `GET` | `/library/problems/:id` | JWT | Get single problem |
 | `DELETE` | `/library/problems/:id` | JWT | Delete problem |
-| `POST` | `/library/problems/:id/flag` | JWT | Flag for re-test |
 
 ### Tourney (Tournament Management)
 
