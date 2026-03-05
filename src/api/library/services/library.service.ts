@@ -147,6 +147,7 @@ export class LibraryService {
       );
 
       // 5. Update problem status based on test result
+      // isContestReady: set true on pass, never reverted on failure ("once validated, always validated")
       const finalStatus = testResult.testPassed ? ProblemStatus.Passed : ProblemStatus.Failed;
 
       await this.prisma.problem.update({
@@ -154,6 +155,7 @@ export class LibraryService {
         data: {
           status: finalStatus,
           buildLog: `${testResult.buildLog}\n\n=== Runtime Output ===\n${testResult.runtimeLog}`,
+          ...(testResult.testPassed && { isContestReady: true }),
         },
       });
 
