@@ -1,0 +1,96 @@
+// AI Arena API - Prisma Schema
+// Database schema for Problem Library and Tournament Management
+// Tech Stack: Prisma 7 + PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// PROBLEM LIBRARY MODELS
+// ============================================================================
+
+/// Problem represents a single AI competition problem uploaded to the library.
+/// Zip files are stored on local filesystem (PROBLEMS_ROOT env var).
+/// Status values match Part 1 Java source exactly: "Pending Test" / "Testing" / "Passed" / "Failed"
+model Problem {
+  id               String    @id @default(uuid())
+  name             String
+  description      String?
+  status           String    @default("Pending Test") // "Pending Test" | "Testing" | "Passed" | "Failed"
+  zipFileName      String?
+  zipFilePath      String?   // local filesystem path to stored zip
+  buildLog         String?   @db.Text
+  isTested         Boolean   @default(false)
+  isContestReady   Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  createdBy        String?
+  
+  // Relations
+  contests         Contest[]
+  
+  @@map("problems")
+}
+
+// ============================================================================
+// TOURNAMENT MODELS
+// ============================================================================
+
+/// Tournament represents a bracket-style competition with multiple rounds.
+/// Full bracket structure ported from Part 1's in-memory model, now persisted to Postgres.
+model Tournament {
+  id                    String    @id @default(uuid())
+  name                  String
+  numRounds             Int
+  initialEntrants       Int
+  maxContestantsPerMatch Int
+  advancingContestants  Int
+  startDate             DateTime  @default(now())
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  createdBy             String?
+  
+  // Relations
+  rounds                Round[]
+  
+  @@map("tournaments")
+}
+
+/// Round represents one stage of a tournament (e.g., Round of 16, Quarter-finals).
+model Round {
+  id           String    @id @default(uuid())
+  roundNumber  Int
+  roundName    String
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  
+  // Relations
+  contests     Contest[]
+  
+  @@map("rounds")
+}
+
+/// Contest represents a single match within a round.
+/// Each contest can have multiple entrants (up to maxContestantsPerMatch) and one winner.
+model Contest {
+  id          String    @id @default(uuid())
+  roundId     String
+  round       Round     @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  problemId   String?
+  problem     Problem?  @relation(fields: [problemId], references: [id])
+  entrantIds  String[]  @default([])  // Postgres array of contestant IDs
+  winnerId    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@map("contests")
+}
+
