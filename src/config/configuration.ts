@@ -7,8 +7,8 @@ export default () => ({
     url: process.env.DATABASE_URL,
   },
   auth: {
-    secret: process.env.AUTH_SECRET,
-    validIssuers: (process.env.VALID_ISSUERS || '').split(',').filter(Boolean),
+    jwksUri: process.env.JWKS_URI || 'https://auth.topcoder-dev.com/.well-known/jwks.json',
+    validIssuers: (process.env.VALID_ISSUERS || 'https://auth.topcoder-dev.com/').split(',').filter(Boolean),
   },
   storage: {
     problemsRoot: process.env.PROBLEMS_ROOT || './data/problems',
@@ -24,8 +24,9 @@ export const validationSchema = Joi.object({
   PORT: Joi.number().default(3000),
   NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
   DATABASE_URL: Joi.string().required(),
-  AUTH_SECRET: Joi.string().required(),
-  VALID_ISSUERS: Joi.string().required(),
+  JWKS_URI: Joi.string().uri().default('https://auth.topcoder-dev.com/.well-known/jwks.json'),
+  VALID_ISSUERS: Joi.string().default('https://auth.topcoder-dev.com/'),
+  AUTH_SECRET: Joi.string().optional().allow(''), // kept for backwards compat, no longer used
   PROBLEMS_ROOT: Joi.string().default('./data/problems'),
   ARENA_SYNTHETICA_WAR_PATH: Joi.string().allow('').optional(),
   CORS_ORIGINS: Joi.string().default('https://local.topcoder-dev.com'),

@@ -245,7 +245,7 @@ The script will:
 
 1. Deploy platform-ui locally (see [Platform-UI Integration](#platform-ui-integration))
 2. Log in at `https://local.topcoder-dev.com/` with your Topcoder Dev account
-3. Open browser DevTools → **Application** → **Cookies** → copy the `v3jwt` cookie value
+3. Open browser DevTools → **Application** → **Cookies** → copy the `tcjwt` cookie value
 
 Or use `Authorization` header from any authenticated platform-ui network request (DevTools → **Network** tab → any API call → **Request Headers** → `Authorization`).
 
@@ -406,10 +406,10 @@ Follow the [platform-ui README](https://github.com/topcoder-platform/platform-ui
 #### 4. Log in and extract your JWT
 
 1. Go to `https://local.topcoder-dev.com/` and log in with your **Topcoder Dev** account
-2. Open browser DevTools → **Application** → **Cookies** → copy the `v3jwt` cookie value
+2. Open browser DevTools → **Application** → **Cookies** → copy the `tcjwt` cookie value
 3. Use that value as your JWT for curl commands and the smoke test script:
    ```bash
-   export JWT="<v3jwt-cookie-value>"
+   export JWT="<tcjwt-cookie-value>"
    ./scripts/smoke-test.sh
    ```
 

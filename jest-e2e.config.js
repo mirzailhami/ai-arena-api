@@ -8,6 +8,7 @@ module.exports = {
     '^.+\\.(t|j)s$': 'ts-jest',
   },
   moduleNameMapper: {
+    '^jwks-rsa$': '<rootDir>/test/__mocks__/jwks-rsa.js',
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@shared/(.*)$': '<rootDir>/src/shared/$1',
     '^@api/(.*)$': '<rootDir>/src/api/$1',
