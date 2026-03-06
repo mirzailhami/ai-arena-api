@@ -105,7 +105,7 @@ pnpm prisma generate
 pnpm run start:dev
 ```
 
-API will be available at **http://localhost:3000**
+API will be available at **http://localhost:3000/arena-manager/api**
 
 Swagger docs at **http://localhost:3000/api**
 
@@ -169,13 +169,18 @@ CORS_ORIGINS="https://local.topcoder-dev.com,http://localhost:4200"
 
 ### Tourney (Tournament Management)
 
+> All routes served under `/arena-manager/api` global prefix, matching the Java
+> `TourneyManagerResource` contract (after nginx strips `/arena-manager/api`).
+> Response shape: `{ success, data: TourneyResponseDto, message }` where
+> `TourneyResponseDto` uses `tourneyId`, `bracketStructure.rounds[].contests[].contestId`.
+
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `POST` | `/tourneys` | JWT | Create tournament with bracket |
-| `GET` | `/tourneys` | JWT | List all tournaments |
-| `GET` | `/tourneys/:id` | JWT | Get tournament + full bracket |
-| `PUT` | `/tourneys/:id/rounds/:roundNumber/contests/:contestId/problems/:problemId` | JWT | Assign problem to contest |
-| `DELETE` | `/tourneys/:id` | JWT | Delete tournament |
+| `POST` | `/tourney/create` | JWT | Create tournament + auto-generate bracket (returns 200) |
+| `GET` | `/tourney/list` | JWT | List all tournaments |
+| `GET` | `/tourney/:tourneyId` | JWT | Get tournament + full bracket |
+| `DELETE` | `/tourney/:tourneyId` | JWT | Delete tournament (returns 200 + body) |
+| `PUT` | `/tourney/:tourneyId/round/:roundNumber/contest/:contestId/problem/:problemId` | JWT | Assign problem to contest |
 
 ### Swagger Documentation
 
@@ -234,9 +239,9 @@ The script will:
 - Trigger Docker test cycle → 200, check `success` field
 - Get build log → 200
 - Flag problem as contest-ready → 200
-- Create a tournament with a 2-round bracket → 201
+- Create a tournament with a 2-round bracket via `POST /tourney/create` → 200
 - Assign problem to contest (path param PUT) → 200
-- Delete tournament → 204 and verify 404
+- Delete tournament via `DELETE /tourney/:id` → 200 and verify 404
 - Delete problem → 200
 
 > **Docker test note**: Step 4 (Docker test cycle) requires the Docker daemon to be accessible from the running process (`docker ps` must succeed). If Docker is not available, the test is reported as INFO (not a hard failure) and all other tests still run.
@@ -261,16 +266,17 @@ Example curl commands:
 
 ```bash
 export JWT="eyJ..."  # your Topcoder JWT
+BASE="http://localhost:3000/arena-manager/api"
 
 # Auth: either Authorization: Bearer OR sessionId header (platform-ui default)
 AUTH="sessionId: ${JWT}"
 
 # List problems  (returns { success, data: [...], message })
-curl -s http://localhost:3000/problem/list \
+curl -s "${BASE}/problem/list" \
   -H "${AUTH}" | jq
 
 # Upload a problem ZIP (binary octet-stream)
-curl -s -X POST http://localhost:3000/problem/upload \
+curl -s -X POST "${BASE}/problem/upload" \
   -H "${AUTH}" \
   -H "Content-Type: application/octet-stream" \
   -H "Content-Disposition: attachment; filename=\"my-problem.zip\"" \
@@ -278,34 +284,38 @@ curl -s -X POST http://localhost:3000/problem/upload \
   --data-binary @/path/to/problem.zip | jq
 
 # Run Docker test cycle
-curl -s -X POST http://localhost:3000/problem/test/<id> \
+curl -s -X POST "${BASE}/problem/test/<id>" \
   -H "${AUTH}" | jq
 
 # Get build log
-curl -s http://localhost:3000/problem/<id>/log \
+curl -s "${BASE}/problem/<id>/log" \
   -H "${AUTH}" | jq
 
 # Flag problem as contest-ready
-curl -s -X POST http://localhost:3000/problem/flag/<id> \
+curl -s -X POST "${BASE}/problem/flag/<id>" \
   -H "${AUTH}" -H "Content-Type: application/json" -d 'true' | jq
 
-# Create tournament
-curl -s -X POST http://localhost:3000/tourneys \
+# Create tournament  (returns 200 + { data: { tourneyId, bracketStructure, ... } })
+curl -s -X POST "${BASE}/tourney/create" \
   -H "${AUTH}" \
   -H "Content-Type: application/json" \
   -d '{"name":"Test Tourney","numRounds":2,"initialEntrants":8,"maxContestantsPerMatch":4,"advancingContestants":1}' | jq
 
-# Get full bracket (copy contestId from response)
-curl -s http://localhost:3000/tourneys/<id> \
+# List all tournaments
+curl -s "${BASE}/tourney/list" \
+  -H "${AUTH}" | jq
+
+# Get full bracket (copy contestId from bracketStructure.rounds[].contests[].contestId)
+curl -s "${BASE}/tourney/<tourneyId>" \
   -H "${AUTH}" | jq
 
 # Assign problem to contest
-curl -s -X PUT "http://localhost:3000/tourneys/<id>/rounds/1/contests/<contestId>/problems/<problemId>" \
+curl -s -X PUT "${BASE}/tourney/<tourneyId>/round/1/contest/<contestId>/problem/<problemId>" \
   -H "${AUTH}" | jq
 
-# Delete tournament
-curl -s -X DELETE http://localhost:3000/tourneys/<id> \
-  -H "Authorization: Bearer ${JWT}" -w "%{http_code}"
+# Delete tournament  (returns 200 + body)
+curl -s -X DELETE "${BASE}/tourney/<tourneyId>" \
+  -H "${AUTH}" | jq
 ```
 
 ---
@@ -321,7 +331,7 @@ docker-compose up -d
 ```
 
 Services:
-- **API**: http://localhost:3000
+- **API**: http://localhost:3000/arena-manager/api
 - **PostgreSQL**: localhost:5432
 - **Swagger**: http://localhost:3000/api
 
@@ -396,7 +406,7 @@ On your local machine (not inside Docker), add to `/etc/hosts`:
 
 ```bash
 docker-compose up -d postgres
-pnpm run start:dev   # API on http://localhost:3000
+pnpm run start:dev   # API on http://localhost:3000/arena-manager/api
 ```
 
 #### 3. Deploy platform-ui
