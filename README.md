@@ -471,15 +471,21 @@ Official references:
 ### How This Project Handles It
 
 **1. CLI operations** (`prisma migrate`, `prisma generate`, `prisma studio`):  
-Configured via `prisma.config.ts` at the project root, using the `env()` helper from `"prisma/config"` (Prisma's type-safe env reader — no `dotenv` workaround needed):
+Configured via `prisma.config.ts` at the project root. It imports `dotenv/config` to load `.env` before Prisma's `env()` helper reads `DATABASE_URL`:
 
 ```ts
 // prisma.config.ts
+import "dotenv/config";
 import { defineConfig, env } from "prisma/config";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
-  datasource: { url: env("DATABASE_URL") },
+  migrations: {
+    path: "prisma/migrations",
+  },
+  datasource: {
+    url: env("DATABASE_URL"),
+  },
 });
 ```
 
