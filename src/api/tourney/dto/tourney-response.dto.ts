@@ -1,73 +1,60 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-/**
- * Represents a single contest/match within a round.
- */
 export class ContestDto {
-  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000' })
-  id: string;
+  @ApiProperty({ example: '69e90fcd-b86b-4d6b-9281-336ae3bd15b4' })
+  contestId: string;
 
-  @ApiProperty({ example: '456e7890-e89b-12d3-a456-426614174000', required: false })
-  problemId?: string;
+  @ApiProperty({ example: null, nullable: true })
+  problemId: string | null;
 
-  @ApiProperty({ example: ['entrant1', 'entrant2'], type: [String] })
-  entrantIds: string[];
+  @ApiProperty({ example: null, nullable: true, type: [String] })
+  entrantIds: string[] | null;
 
-  @ApiProperty({ example: 'entrant1', required: false })
-  winnerId?: string;
+  @ApiProperty({ example: null, nullable: true })
+  winnerId: string | null;
 }
 
-/**
- * Represents one round of the tournament.
- */
 export class RoundDto {
-  @ApiProperty({ example: '789e0123-e89b-12d3-a456-426614174000' })
-  id: string;
-
   @ApiProperty({ example: 1 })
   roundNumber: number;
 
-  @ApiProperty({ example: 'Round 1 (8 Contests)' })
+  @ApiProperty({ example: 'Round 1 (4 Contests)' })
   roundName: string;
 
   @ApiProperty({ type: [ContestDto] })
   contests: ContestDto[];
 }
 
-/**
- * Tournament response DTO with full bracket structure.
- */
-export class TourneyResponseDto {
-  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000' })
-  id: string;
+export class BracketStructureDto {
+  @ApiProperty({ type: [RoundDto] })
+  rounds: RoundDto[];
+}
 
-  @ApiProperty({ example: 'Grand Championship 2026' })
+export class TourneyResponseDto {
+  @ApiProperty({ example: '63fd0f73-ce2c-45f2-9da3-11a6440687e7' })
+  tourneyId: string;
+
+  @ApiProperty({ example: 'Sample Tourney' })
   name: string;
 
-  @ApiProperty({ example: 4 })
+  @ApiProperty({ example: 3 })
   numRounds: number;
 
-  @ApiProperty({ example: 32 })
+  @ApiProperty({ example: 8 })
   initialEntrants: number;
 
-  @ApiProperty({ example: 4 })
+  @ApiProperty({ example: 2 })
   maxContestantsPerMatch: number;
 
   @ApiProperty({ example: 1 })
   advancingContestants: number;
 
-  @ApiProperty({ example: '2026-01-01T12:00:00.000Z' })
-  startDate: Date;
+  @ApiProperty({ example: 1772751041403, description: 'Unix timestamp in ms' })
+  startDate: number;
 
   @ApiProperty({ example: true })
   isActive: boolean;
 
-  @ApiProperty({ example: '2026-01-01T12:00:00.000Z' })
-  createdAt: Date;
-
-  @ApiProperty({ example: 'user-123', required: false })
-  createdBy?: string;
-
-  @ApiProperty({ type: [RoundDto], description: 'Full bracket structure with rounds and contests' })
-  rounds: RoundDto[];
+  @ApiProperty({ type: BracketStructureDto })
+  bracketStructure: BracketStructureDto;
 }
