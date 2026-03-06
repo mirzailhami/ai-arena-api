@@ -239,12 +239,14 @@ sudo apt install jq
 ```
 
 ```bash
-# Run all smoke tests (will prompt for JWT if not set)
-JWT="eyJ..." ./scripts/smoke-test.sh
+# Option 1: Save JWT to a file (recommended — avoids terminal truncation of long tokens)
+# Copy the JWT from your browser, paste it into a file using any text editor:
+echo 'eyJ...' > jwt.txt        # or open jwt.txt in your editor and paste
+JWT="$(cat jwt.txt)" bash ./scripts/smoke-test.sh
 
-# Or export once and reuse
+# Option 2: Export inline (may truncate in some terminals)
 export JWT="eyJ..."
-./scripts/smoke-test.sh
+bash ./scripts/smoke-test.sh
 ```
 
 The script will:
