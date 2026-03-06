@@ -6,6 +6,27 @@ Built with **NestJS 10**, **TypeScript 5**, **Prisma 7**, and **PostgreSQL**.
 
 ---
 
+## Table of Contents
+
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [API Endpoints](#api-endpoints)
+- [Development](#development)
+  - [Available Scripts](#available-scripts)
+  - [Smoke Testing](#smoke-testing)
+  - [Manual API Testing](#manual-api-testing)
+- [Docker Deployment](#docker-deployment)
+- [Production Deployment](#production-deployment)
+- [Platform-UI Integration](#platform-ui-integration)
+- [Architecture](#architecture)
+- [Prisma 7 Compatibility Notes](#prisma-7-compatibility-notes)
+- [Troubleshooting](#troubleshooting)
+
+---
+
 ## Features
 
 ### Problem Library Management
