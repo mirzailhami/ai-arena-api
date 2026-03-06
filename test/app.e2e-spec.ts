@@ -55,28 +55,28 @@ describe('AI Arena API (e2e)', () => {
       return request(app.getHttpServer()).get('/problem/list').expect(401);
     });
 
-    it('GET /tourneys returns 401 when no token provided', () => {
-      return request(app.getHttpServer()).get('/tourneys').expect(401);
+    it('GET /tourney/list returns 401 when no token provided', () => {
+      return request(app.getHttpServer()).get('/tourney/list').expect(401);
     });
 
     it('POST /problem/upload returns 401 when no token provided', () => {
       return request(app.getHttpServer()).post('/problem/upload').expect(401);
     });
 
-    it('POST /tourneys returns 401 when no token provided', () => {
-      return request(app.getHttpServer()).post('/tourneys').expect(401);
+    it('POST /tourney/create returns 401 when no token provided', () => {
+      return request(app.getHttpServer()).post('/tourney/create').expect(401);
     });
 
-    it('DELETE /tourneys/:id returns 401 when no token provided', () => {
+    it('DELETE /tourney/:id returns 401 when no token provided', () => {
       return request(app.getHttpServer())
-        .delete('/tourneys/00000000-0000-0000-0000-000000000000')
+        .delete('/tourney/00000000-0000-0000-0000-000000000000')
         .expect(401);
     });
 
     it('PUT assign problem returns 401 when no token provided', () => {
       return request(app.getHttpServer())
         .put(
-          '/tourneys/00000000-0000-0000-0000-000000000000/rounds/1/contests/00000000-0000-0000-0000-000000000001/problems/00000000-0000-0000-0000-000000000002',
+          '/tourney/00000000-0000-0000-0000-000000000000/round/1/contest/00000000-0000-0000-0000-000000000001/problem/00000000-0000-0000-0000-000000000002',
         )
         .expect(401);
     });
@@ -102,7 +102,7 @@ describe('AI Arena API (e2e)', () => {
 
   // ── Validation pipe ───────────────────────────────────────────────────────
 
-  describe('POST /tourneys validation (with fake token structure)', () => {
+  describe('POST /tourney/create validation (with fake token structure)', () => {
     // We cannot get a real Topcoder JWT in CI, but we can confirm that
     // a structurally invalid body returns 400, not 500, when auth passes.
     // These tests use a well-formed (but invalid signature) JWT to reach
@@ -110,7 +110,7 @@ describe('AI Arena API (e2e)', () => {
     // In strict environments these will return 401 — that is also acceptable.
     it('returns 400 or 401 — never 500 — on empty body', async () => {
       const res = await request(app.getHttpServer())
-        .post('/tourneys')
+        .post('/tourney/create')
         .set('Content-Type', 'application/json')
         .send({});
       expect([400, 401]).toContain(res.status);

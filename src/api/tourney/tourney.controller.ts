@@ -53,7 +53,11 @@ export class TourneyController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Create a new tournament' })
   @ApiBody({ type: CreateTourneyDto })
-  @ApiResponse({ status: 200, description: 'Tournament created successfully', type: TourneyResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Tournament created successfully',
+    type: TourneyResponseDto,
+  })
   @ApiResponse({ status: 400, description: 'Invalid tournament configuration' })
   async createTournament(
     @Body() createDto: CreateTourneyDto,
@@ -125,7 +129,11 @@ export class TourneyController {
   @ApiParam({ name: 'roundNumber', description: 'Round number (1-based)', type: Number })
   @ApiParam({ name: 'contestId', description: 'Contest UUID' })
   @ApiParam({ name: 'problemId', description: 'Problem UUID' })
-  @ApiResponse({ status: 200, description: 'Problem assigned successfully', type: TourneyResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Problem assigned successfully',
+    type: TourneyResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'Tournament, round, contest, or problem not found' })
   async assignProblem(
     @Param('tourneyId') tourneyId: string,
@@ -133,8 +141,18 @@ export class TourneyController {
     @Param('contestId') contestId: string,
     @Param('problemId') problemId: string,
   ): Promise<ResponseObject<TourneyResponseDto>> {
-    const result = await this.tourneyService.assignProblem(tourneyId, roundNumber, contestId, problemId);
-    this.logger.log(`Assigned problem ${problemId} to contest ${contestId} in tourney ${tourneyId} round ${roundNumber}`);
-    return okResponse(result, `Problem ${problemId} assigned to Contest ${contestId} successfully.`);
+    const result = await this.tourneyService.assignProblem(
+      tourneyId,
+      roundNumber,
+      contestId,
+      problemId,
+    );
+    this.logger.log(
+      `Assigned problem ${problemId} to contest ${contestId} in tourney ${tourneyId} round ${roundNumber}`,
+    );
+    return okResponse(
+      result,
+      `Problem ${problemId} assigned to Contest ${contestId} successfully.`,
+    );
   }
 }

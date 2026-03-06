@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { spawn } from 'child_process';
-import * as fs from 'fs/promises';
 import { DockerTestResult } from '../interfaces/docker-test-result.interface';
 
 /**

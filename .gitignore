@@ -35,3 +35,4 @@ Thumbs.db
 # Challenge problem ZIPs (do not commit)
 scripts/problems/*.zip
 RECORDING.md
+data/

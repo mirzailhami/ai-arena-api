@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Contest, Round } from '@prisma/client';
 import { CreateTourneyDto } from '../dto';
 
 /**

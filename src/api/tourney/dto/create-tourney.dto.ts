@@ -54,7 +54,11 @@ export class CreateTourneyDto {
   @Max(5)
   advancingContestants: number;
 
-  @ApiProperty({ example: '2026-03-10T00:00:00.000Z', description: 'Tournament start date (ISO 8601)', required: false })
+  @ApiProperty({
+    example: '2026-03-10T00:00:00.000Z',
+    description: 'Tournament start date (ISO 8601)',
+    required: false,
+  })
   @IsOptional()
   @IsDateString()
   startDate?: string;

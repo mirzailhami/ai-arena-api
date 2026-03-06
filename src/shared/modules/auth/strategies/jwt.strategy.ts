@@ -33,6 +33,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         // Standard Authorization: Bearer header (Swagger / curl)
         ExtractJwt.fromAuthHeaderAsBearerToken(),
         // platform-ui sends JWT in the 'sessionId' request header
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (req: any) => (req?.headers?.['sessionid'] as string) || null,
       ]),
       secretOrKeyProvider: passportJwtSecret({

@@ -140,6 +140,7 @@ export class TourneyService {
     this.logger.log(`Deleted tournament ${tournamentId}`);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private mapToResponseDto(tournament: any): TourneyResponseDto {
     return {
       tourneyId: tournament.id,
@@ -148,14 +149,14 @@ export class TourneyService {
       initialEntrants: tournament.initialEntrants,
       maxContestantsPerMatch: tournament.maxContestantsPerMatch,
       advancingContestants: tournament.advancingContestants,
-      startDate: tournament.startDate
-        ? new Date(tournament.startDate).getTime()
-        : Date.now(),
+      startDate: tournament.startDate ? new Date(tournament.startDate).getTime() : Date.now(),
       isActive: tournament.isActive,
       bracketStructure: {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         rounds: tournament.rounds.map((round: any) => ({
           roundNumber: round.roundNumber,
           roundName: round.roundName,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           contests: round.contests.map((contest: any) => ({
             contestId: contest.id,
             problemId: contest.problemId ?? null,

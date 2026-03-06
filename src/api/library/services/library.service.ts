@@ -236,7 +236,7 @@ export class LibraryService {
    * @param problemId - Problem ID to delete
    */
   async deleteProblem(problemId: string): Promise<void> {
-    const problem = await this.getProblemById(problemId);
+    await this.getProblemById(problemId);
 
     // Delete files
     const problemDir = path.join(this.problemsRoot, problemId);

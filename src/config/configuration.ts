@@ -8,7 +8,9 @@ export default () => ({
   },
   auth: {
     jwksUri: process.env.JWKS_URI || 'https://auth.topcoder-dev.com/.well-known/jwks.json',
-    validIssuers: (process.env.VALID_ISSUERS || 'https://auth.topcoder-dev.com/').split(',').filter(Boolean),
+    validIssuers: (process.env.VALID_ISSUERS || 'https://auth.topcoder-dev.com/')
+      .split(',')
+      .filter(Boolean),
   },
   storage: {
     problemsRoot: process.env.PROBLEMS_ROOT || './data/problems',

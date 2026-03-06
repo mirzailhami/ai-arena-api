@@ -15,7 +15,10 @@ async function bootstrap() {
   app.setGlobalPrefix('arena-manager/api');
 
   // Binary upload support — path must include the global prefix since app.use() is Express-level.
-  app.use('/arena-manager/api/problem/upload', raw({ type: 'application/octet-stream', limit: '200mb' }));
+  app.use(
+    '/arena-manager/api/problem/upload',
+    raw({ type: 'application/octet-stream', limit: '200mb' }),
+  );
 
   // JSON parser with strict:false so raw boolean/null/string/number JSON values are accepted
   // (by default express/body-parser strict:true only allows objects and arrays)
@@ -38,7 +41,13 @@ async function bootstrap() {
   const corsOrigins = configService.get<string>('CORS_ORIGINS', '').split(',').filter(Boolean);
   app.enableCors({
     origin: corsOrigins.length > 0 ? corsOrigins : '*',
-    allowedHeaders: ['Content-Type', 'Authorization', 'sessionId', 'X-Problem-Name', 'Content-Disposition'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'sessionId',
+      'X-Problem-Name',
+      'Content-Disposition',
+    ],
   });
 
   // Swagger API documentation

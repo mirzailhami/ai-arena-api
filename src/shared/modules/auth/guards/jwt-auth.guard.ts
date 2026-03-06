@@ -40,6 +40,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
    * Custom error handling for authentication failures.
    * Logs warning and delegates to Passport's default error handling.
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   handleRequest(err: any, user: any, info: any, context: ExecutionContext) {
     if (err || !user) {
       const request = context.switchToHttp().getRequest();
