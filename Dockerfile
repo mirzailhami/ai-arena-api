@@ -19,7 +19,9 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
-# Generate Prisma Client
+# Generate Prisma Client (dummy URL needed at build time — Prisma 7 validates env during generate)
+ARG DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy
+ENV DATABASE_URL=$DATABASE_URL
 RUN pnpm prisma generate
 
 # Build application
@@ -31,22 +33,20 @@ FROM node:20-alpine AS production
 # Install pnpm globally
 RUN npm install -g pnpm@10.23.0
 
-# Install Docker CLI for problem testing
-RUN apk add --no-cache docker-cli
+# Install Docker CLI for problem testing and bash (for appStartUp.sh)
+RUN apk add --no-cache docker-cli bash
 
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy package files and node_modules from builder (includes generated Prisma client)
 COPY package.json pnpm-lock.yaml ./
+COPY --from=builder /app/node_modules ./node_modules
 
-# Install production dependencies only
-RUN pnpm install --frozen-lockfile --prod
-
-# Copy built application from builder stage
+# Copy built application and Prisma schema from builder stage
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 
 # Create directories for problem storage
 RUN mkdir -p /app/problems
