@@ -365,7 +365,7 @@ curl -s -X DELETE "${BASE}/tourney/<tourneyId>" \
 Start all services (PostgreSQL + API):
 
 ```bash
-docker-compose up -d
+docker-compose up
 ```
 
 Services:
