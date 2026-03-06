@@ -124,16 +124,17 @@ DATABASE_URL="postgresql://postgres:postgres@localhost:5432/ai_arena?schema=publ
 # Server
 PORT=3000
 
-# JWT Authentication (Topcoder)
-AUTH_SECRET="your-secret-key-here"
-VALID_ISSUERS="https://topcoder-dev.auth0.com/,https://topcoder.auth0.com/"
+# JWT Authentication (Topcoder Auth0 RS256 — keys fetched from JWKS, no secret needed)
+JWKS_URI=https://auth.topcoder-dev.com/.well-known/jwks.json
+VALID_ISSUERS=https://auth.topcoder-dev.com/
+AUTH_SECRET=
 
 # File Storage — relative paths work; adjust to any directory on your machine
 PROBLEMS_ROOT="./data/problems"
 ARENA_SYNTHETICA_WAR_PATH=""   # optional: absolute path to synthetica2.war
 
 # CORS (for platform-ui integration)
-CORS_ORIGINS="https://local.topcoder-dev.com,http://localhost:4200"
+CORS_ORIGINS="https://local.topcoder-dev.com,http://localhost:4200,http://localhost:3000"
 ```
 
 ### Key Paths
@@ -149,7 +150,7 @@ CORS_ORIGINS="https://local.topcoder-dev.com,http://localhost:4200"
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `GET` | `/health` | Public | Service health status |
+| `GET` | `/arena-manager/api/health` | Public | Service health status |
 
 ### Library (Problem Management)
 
@@ -346,10 +347,10 @@ Run container:
 ```bash
 docker run -p 3000:3000 \
   -e DATABASE_URL="postgresql://postgres:postgres@host.docker.internal:5432/ai_arena" \
-  -e AUTH_SECRET="your-secret" \
-  -e VALID_ISSUERS="https://topcoder-dev.auth0.com/" \
+  -e JWKS_URI="https://auth.topcoder-dev.com/.well-known/jwks.json" \
+  -e VALID_ISSUERS="https://auth.topcoder-dev.com/" \
   -e PROBLEMS_ROOT="/app/problems" \
-  -v $(pwd)/problems:/app/problems \
+  -v $(pwd)/data/problems:/app/problems \
   -v /var/run/docker.sock:/var/run/docker.sock \
   ai-arena-api
 ```
@@ -362,7 +363,7 @@ docker run -p 3000:3000 \
 
 ### Pre-Deployment Checklist
 
-- [ ] Set strong `AUTH_SECRET` in environment
+- [ ] Configure `JWKS_URI` and `VALID_ISSUERS` for production Auth0 tenant
 - [ ] Configure `VALID_ISSUERS` for production Auth0
 - [ ] Set `NODE_ENV=production`
 - [ ] Configure production `DATABASE_URL`
@@ -584,8 +585,8 @@ pnpm prisma generate
 **Solution**:
 1. Verify JWT token is valid (not expired)
 2. Check `VALID_ISSUERS` matches token issuer
-3. Ensure `AUTH_SECRET` matches signing key
-4. Check token is sent in `Authorization: Bearer <token>` header
+3. Confirm `JWKS_URI` is reachable (`curl $JWKS_URI` should return JSON with `keys`)
+4. Check token is sent in `Authorization: Bearer <token>` header (or `sessionId` header)
 
 ---
 
