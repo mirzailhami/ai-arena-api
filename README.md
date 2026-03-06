@@ -603,5 +603,5 @@ For support, contact Topcoder challenge copilots or post in the challenge forum.
 **Part 2 Implementation**: NestJS/TypeScript port with Prisma 7 + PostgreSQL persistence
 
 **References**: 
-- Topcoder projects-api-v6
-- Topcoder review-api-v6
+- [Topcoder projects-api-v6](https://github.com/topcoder-platform/projects-api-v6)
+- [Topcoder review-api-v6](https://github.com/topcoder-platform/review-api-v6)
