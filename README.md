@@ -297,7 +297,7 @@ Or use `Authorization` header from any authenticated platform-ui network request
 Use the built-in Swagger UI to test any endpoint interactively:
 
 1. Open **http://localhost:3000/api** in your browser
-2. Click **Authorize** (top right), enter `Bearer <your-jwt-token>`
+2. Click **Authorize** (top right), enter your JWT token value (no `Bearer` prefix needed)
 3. Expand any endpoint and click **Try it out**
 
 Example curl commands:
