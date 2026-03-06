@@ -130,7 +130,7 @@ UPLOAD_RESP=$(curl -s -w "\n%{http_code}" \
   --data-binary "@${TMP_ZIP}" \
   "${BASE_URL}/problem/upload")
 UPLOAD_HTTP=$(echo "${UPLOAD_RESP}" | tail -1)
-UPLOAD_BODY=$(echo "${UPLOAD_RESP}" | head -n -1)
+UPLOAD_BODY=$(echo "${UPLOAD_RESP}" | sed '$ d')
 
 if [[ "$UPLOAD_HTTP" == "200" ]]; then
   PROBLEM_ID=$(echo "${UPLOAD_BODY}" | jq -r '.data.problemId // empty')
@@ -232,7 +232,7 @@ TOURNEY_RESP=$(curl -s -w "\n%{http_code}" \
   -d '{"name":"Smoke Test Tournament","numRounds":2,"initialEntrants":8,"maxContestantsPerMatch":4,"advancingContestants":1}' \
   "${BASE_URL}/tourney/create")
 TOURNEY_HTTP=$(echo "${TOURNEY_RESP}" | tail -1)
-TOURNEY_BODY=$(echo "${TOURNEY_RESP}" | head -n -1)
+TOURNEY_BODY=$(echo "${TOURNEY_RESP}" | sed '$ d')
 
 if [[ "$TOURNEY_HTTP" == "200" ]]; then
   TOURNEY_ID=$(echo "${TOURNEY_BODY}" | jq -r '.data.tourneyId // empty')
