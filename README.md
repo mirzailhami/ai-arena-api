@@ -19,7 +19,6 @@ Built with **NestJS 10**, **TypeScript 5**, **Prisma 7**, and **PostgreSQL**.
   - [Smoke Testing](#smoke-testing)
   - [Manual API Testing](#manual-api-testing)
 - [Docker Deployment](#docker-deployment)
-- [Production Deployment](#production-deployment)
 - [Architecture](#architecture)
 - [Prisma 7 Compatibility Notes](#prisma-7-compatibility-notes)
 - [Troubleshooting](#troubleshooting)
@@ -392,37 +391,6 @@ docker run -p 3000:3000 \
 ```
 
 **Important**: Mount `/var/run/docker.sock` for Docker-in-Docker problem testing.
-
----
-
-## Production Deployment
-
-### Pre-Deployment Checklist
-
-- [ ] Configure `JWKS_URI` and `VALID_ISSUERS` for production Auth0 tenant
-- [ ] Configure `VALID_ISSUERS` for production Auth0
-- [ ] Set `NODE_ENV=production`
-- [ ] Configure production `DATABASE_URL`
-- [ ] Set appropriate `CORS_ORIGINS` for platform-ui
-- [ ] Ensure Docker daemon is accessible (for problem testing)
-- [ ] Configure persistent volume for `PROBLEMS_ROOT`
-- [ ] (Optional) Mount `synthetica2.war` if using arena base template
-
-### Environment-Specific Configuration
-
-**Development**:
-```bash
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/ai_arena"
-VALID_ISSUERS="https://topcoder-dev.auth0.com/"
-CORS_ORIGINS="http://localhost:4200,https://local.topcoder-dev.com"
-```
-
-**Production**:
-```bash
-DATABASE_URL="postgresql://<user>:<password>@<host>:5432/<db>?ssl=true"
-VALID_ISSUERS="https://topcoder.auth0.com/"
-CORS_ORIGINS="https://platform-ui.topcoder.com"
-```
 
 ---
 
