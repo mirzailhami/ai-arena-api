@@ -11,8 +11,11 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
   const configService = app.get(ConfigService);
 
-  // Binary upload support: parse application/octet-stream bodies for the problem upload route.
-  app.use('/problem/upload', raw({ type: 'application/octet-stream', limit: '200mb' }));
+  // Global prefix matches Java WAR: context path /arena-manager + @ApplicationPath /api
+  app.setGlobalPrefix('arena-manager/api');
+
+  // Binary upload support — path must include the global prefix since app.use() is Express-level.
+  app.use('/arena-manager/api/problem/upload', raw({ type: 'application/octet-stream', limit: '200mb' }));
 
   // JSON parser with strict:false so raw boolean/null/string/number JSON values are accepted
   // (by default express/body-parser strict:true only allows objects and arrays)
@@ -56,7 +59,7 @@ async function bootstrap() {
 
   const port = configService.get<number>('PORT', 3000);
   await app.listen(port);
-  console.log(`🚀 AI Arena API is running on: http://localhost:${port}`);
+  console.log(`🚀 AI Arena API is running on: http://localhost:${port}/arena-manager/api`);
   console.log(`📚 Swagger documentation available at: http://localhost:${port}/api`);
 }
 
