@@ -39,19 +39,19 @@ services:
       VALID_ISSUERS: ${VALID_ISSUERS:-https://auth.topcoder-dev.com/}
       AUTH_SECRET: ""
       PROBLEMS_ROOT: /app/problems
-      ARENA_SYNTHETICA_WAR_PATH: /app/assets/synthetica2.war
+      # ARENA_SYNTHETICA_WAR_PATH: /app/assets/synthetica2.war  # uncomment when WAR volume is mounted
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:4200,http://localhost:3000}
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
-      - ./problems:/app/problems
+      - ./data/problems:/app/problems
       # Mount Docker socket for problem testing (REQUIRED)
       - /var/run/docker.sock:/var/run/docker.sock
       # Optional: Mount synthetica2.war if available
       # - ./assets/synthetica2.war:/app/assets/synthetica2.war
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); })"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/arena-manager/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); })"]
       interval: 30s
       timeout: 10s
       retries: 3
