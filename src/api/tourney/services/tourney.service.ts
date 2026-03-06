@@ -295,6 +295,105 @@ export class TourneyService {
   }
 
   /**
+   * Lists all tournaments in the reference-compatible shape.
+   * GET /tourney/list
+   */
+  async listTournamentsRef(): Promise<TourneyRefResponseDto[]> {
+    const tournaments = await this.prisma.tournament.findMany({
+      include: {
+        rounds: {
+          include: { contests: true },
+          orderBy: { roundNumber: 'asc' },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return tournaments.map(t => this.mapToRefResponseDto(t));
+  }
+
+  /**
+   * Retrieves a single tournament by ID in the reference-compatible shape.
+   * GET /tourney/:id
+   */
+  async getTournamentByIdRef(tournamentId: string): Promise<TourneyRefResponseDto> {
+    const tournament = await this.prisma.tournament.findUnique({
+      where: { id: tournamentId },
+      include: {
+        rounds: {
+          include: { contests: true },
+          orderBy: { roundNumber: 'asc' },
+        },
+      },
+    });
+    if (!tournament) {
+      throw new NotFoundException(`Tournament ${tournamentId} not found`);
+    }
+    return this.mapToRefResponseDto(tournament);
+  }
+
+  /**
+   * Assigns a problem to a specific contest in a round (reference-compatible).
+   * PUT /tourney/:tourneyId/round/:roundNumber/contest/:contestId/problem/:problemId
+   * Mirrors the Java TourneyManagerResource.updateContestProblem() logic exactly.
+   */
+  async assignContestProblemRef(
+    tourneyId: string,
+    roundNumber: number,
+    contestId: string,
+    problemId: string,
+  ): Promise<TourneyRefResponseDto> {
+    const tournament = await this.prisma.tournament.findUnique({
+      where: { id: tourneyId },
+      include: {
+        rounds: {
+          include: { contests: true },
+          orderBy: { roundNumber: 'asc' },
+        },
+      },
+    });
+
+    if (!tournament) {
+      throw new NotFoundException(`Tournament ${tourneyId} not found`);
+    }
+
+    const round = tournament.rounds.find(r => r.roundNumber === roundNumber);
+    if (!round) {
+      throw new NotFoundException(`Round ${roundNumber} not found in tournament ${tourneyId}`);
+    }
+
+    const contest = round.contests.find(c => c.id === contestId);
+    if (!contest) {
+      throw new NotFoundException(`Contest ${contestId} not found in round ${roundNumber}`);
+    }
+
+    const problem = await this.prisma.problem.findUnique({ where: { id: problemId } });
+    if (!problem) {
+      throw new NotFoundException(`Problem ${problemId} not found`);
+    }
+
+    await this.prisma.contest.update({
+      where: { id: contestId },
+      data: { problemId },
+    });
+
+    this.logger.log(
+      `Assigned problem ${problemId} to contest ${contestId} in tournament ${tourneyId} round ${roundNumber}`,
+    );
+
+    const updated = await this.prisma.tournament.findUnique({
+      where: { id: tourneyId },
+      include: {
+        rounds: {
+          include: { contests: true },
+          orderBy: { roundNumber: 'asc' },
+        },
+      },
+    });
+
+    return this.mapToRefResponseDto(updated);
+  }
+
+  /**
    * Updates a tournament's bracket structure (reference-compatible PUT).
    * Iterates all contests in the payload and updates their problemId.
    */

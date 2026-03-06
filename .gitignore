@@ -9,6 +9,9 @@ dist/
 .env.local
 .env.*.local
 
+# Part 1 reference source (local only, not to be committed)
+LibraryPort/
+
 # Prisma generated
 /generated/prisma
 
