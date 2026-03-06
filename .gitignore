@@ -32,7 +32,7 @@ Thumbs.db
 *.prompt.md
 *.plan.md
 
-# Challenge problem ZIPs (do not commit)
-scripts/problems/*.zip
+# Sample problem ZIPs are committed for reviewer testing
 RECORDING.md
 data/
+REVIEWERS_README.md
