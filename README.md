@@ -79,11 +79,12 @@ cd ai-arena-api
 pnpm install
 ```
 
-### 3. Configure Environment
+### 3. Configure Environment (Required)
 ```bash
 cp .env.example .env
-# Edit .env with your configuration (see Configuration section)
 ```
+
+> **Important**: This step is mandatory. Without a `.env` file, Prisma commands will fail with `PrismaConfigEnvError: Cannot resolve environment variable: DATABASE_URL`. The defaults in `.env.example` match the Docker Compose PostgreSQL service, so no edits are needed for local development.
 
 ### 4. Start Database
 ```bash
@@ -568,6 +569,16 @@ docker ps  # Should list containers without error
 ```bash
 pnpm prisma generate
 ```
+
+### Prisma Cannot Resolve DATABASE_URL
+
+**Error**: `PrismaConfigEnvError: Cannot resolve environment variable: DATABASE_URL`
+
+**Solution**: You need a `.env` file in the project root. Copy the example:
+```bash
+cp .env.example .env
+```
+The defaults match the Docker Compose PostgreSQL service — no edits needed for local development.
 
 ### Database Connection Refused
 
