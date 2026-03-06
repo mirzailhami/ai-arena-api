@@ -15,7 +15,7 @@
     "lint:fix": "eslint \"{src,test}/**/*.ts\" --fix",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
+    "test:cov": "jest --coverage --passWithNoTests",
     "test:e2e": "jest --config test/jest-e2e.json --forceExit",
     "test:smoke": "bash ./scripts/smoke-test.sh",
     "prisma:generate": "prisma generate",
