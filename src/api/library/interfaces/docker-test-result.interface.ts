@@ -24,9 +24,6 @@ export interface DockerTestResult {
   /** Docker image ID (if build succeeded) */
   imageId?: string;
 
-  /** Container ID (if run succeeded) */
-  containerId?: string;
-
   /** Total test duration (ms) */
   durationMs: number;
 }

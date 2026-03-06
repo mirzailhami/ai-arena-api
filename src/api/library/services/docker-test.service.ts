@@ -42,7 +42,6 @@ export class DockerTestService {
     let runtimeLog = '';
     let runtimeError = '';
     let imageId = '';
-    let containerId = '';
     let exitCode = -1;
 
     try {
@@ -65,21 +64,16 @@ export class DockerTestService {
       imageId = buildResult.imageId || '';
       this.logger.log(`Docker build succeeded. Image ID: ${imageId}`);
 
-      // 2. Docker run
+      // 2. Docker run — exit code captured directly from process close event
       this.logger.log(`Running Docker container for problem ${problemId}...`);
       const runResult = await this.dockerRun(imageName, containerName, timeoutMs);
       runtimeLog = runResult.stdout;
       runtimeError = runResult.stderr;
-      containerId = runResult.containerId || '';
+      exitCode = runResult.exitCode;
+      this.logger.log(`Container ${containerName} exited with code ${exitCode}`);
 
-      // 3. Docker inspect (get exit code)
-      if (containerId) {
-        exitCode = await this.dockerInspectExitCode(containerId);
-        this.logger.log(`Container ${containerId} exited with code ${exitCode}`);
-      }
-
-      // 4. Clean up
-      await this.cleanup(containerId, imageId);
+      // 3. Clean up
+      await this.cleanup(containerName, imageId);
 
       return {
         buildSuccess: true,
@@ -89,7 +83,6 @@ export class DockerTestService {
         runtimeError: runtimeError || undefined,
         exitCode,
         imageId,
-        containerId,
         durationMs: Date.now() - startTime,
       };
     } catch (error) {
@@ -180,14 +173,14 @@ export class DockerTestService {
     imageName: string,
     containerName: string,
     timeoutMs: number,
-  ): Promise<{ stdout: string; stderr: string; containerId?: string }> {
+  ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     return new Promise((resolve) => {
       let stdout = '';
       let stderr = '';
-      const containerId = '';
       let timedOut = false;
 
-      const proc = spawn('docker', ['run', '--name', containerName, '--rm', imageName]);
+      // No --rm: we handle cleanup ourselves so the container persists for log capture
+      const proc = spawn('docker', ['run', '--name', containerName, imageName]);
 
       // Timeout enforcement
       const timeout = setTimeout(() => {
@@ -206,7 +199,8 @@ export class DockerTestService {
 
       proc.on('close', (code) => {
         clearTimeout(timeout);
-        resolve({ stdout, stderr, containerId });
+        // docker run exits with the container's exit code directly
+        resolve({ stdout, stderr, exitCode: timedOut ? -1 : (code ?? -1) });
       });
 
       proc.on('error', (err) => {
@@ -214,38 +208,8 @@ export class DockerTestService {
         resolve({
           stdout,
           stderr: stderr + `\nDocker run spawn error: ${err.message}`,
+          exitCode: -1,
         });
-      });
-    });
-  }
-
-  /**
-   * Inspects container to retrieve exit code.
-   *
-   * @param containerId - Container ID or name
-   * @returns Container exit code
-   */
-  private async dockerInspectExitCode(containerId: string): Promise<number> {
-    return new Promise((resolve) => {
-      const proc = spawn('docker', ['inspect', '--format', '{{.State.ExitCode}}', containerId]);
-
-      let output = '';
-
-      proc.stdout.on('data', (data) => {
-        output += data.toString();
-      });
-
-      proc.on('close', (code) => {
-        if (code === 0) {
-          const exitCode = parseInt(output.trim(), 10);
-          resolve(isNaN(exitCode) ? -1 : exitCode);
-        } else {
-          resolve(-1);
-        }
-      });
-
-      proc.on('error', () => {
-        resolve(-1);
       });
     });
   }
