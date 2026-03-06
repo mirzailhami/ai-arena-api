@@ -70,7 +70,7 @@ Built with **NestJS 10**, **TypeScript 5**, **Prisma 7**, and **PostgreSQL**.
 
 ### 1. Clone Repository
 ```bash
-git clone <repository-url>
+git clone https://github.com/mirzailhami/ai-arena-api
 cd ai-arena-api
 ```
 
