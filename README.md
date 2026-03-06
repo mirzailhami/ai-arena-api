@@ -223,7 +223,20 @@ pnpm prisma studio        # Open Prisma Studio (DB GUI)
 
 A self-contained smoke test script covers all endpoints automatically.
 
-**Requirements**: `curl`, `jq`, and a valid Topcoder JWT token (see [Getting a JWT token](#getting-a-jwt-token)).
+**Requirements**: `curl`, `jq`, `zip`, and a valid Topcoder JWT token (see [Getting a JWT token](#getting-a-jwt-token)).
+
+Install `jq` if not already available:
+```bash
+# macOS
+brew install jq
+
+# Ubuntu/Debian
+sudo apt install jq
+
+# Windows (Git Bash / WSL)
+# WSL: sudo apt install jq
+# Or download from https://jqlang.github.io/jq/download/
+```
 
 ```bash
 # Run all smoke tests (will prompt for JWT if not set)
