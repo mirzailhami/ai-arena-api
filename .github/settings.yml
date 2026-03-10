@@ -1,0 +1,15 @@
+repository:
+  description: "NestJS REST API for managing AI competition problems and tournament brackets on the Topcoder AI Arena platform"
+  topics:
+    - nestjs
+    - typescript
+    - api
+    - ai
+    - tournament
+    - brackets
+    - prisma
+    - postgresql
+    - docker
+    - topcoder
+    - competition
+    - rest-api
