@@ -13,7 +13,7 @@ import { ResponseObject } from '../common/api-response'
 import { ArenaAuthGuard } from '../common/auth.guard'
 import { CreateTournamentDto } from './dto/create-tournament.dto'
 import { UpdateTournamentDto } from './dto/update-tournament.dto'
-import { TournamentDto } from './tournament.types'
+import { RoomDto, TournamentDto } from './tournament.types'
 import { TournamentsService } from './tournaments.service'
 
 @Controller('tourney')
@@ -68,5 +68,26 @@ export class TournamentsController {
     @Param('tourneyId') tourneyId: string,
   ): Promise<ResponseObject<string | null>> {
     return this.tournamentsService.deleteTournament(tourneyId)
+  }
+
+  @Post(':tourneyId/publish')
+  publishTournament(
+    @Param('tourneyId') tourneyId: string,
+  ): Promise<ResponseObject<TournamentDto | null>> {
+    return this.tournamentsService.publishTournament(tourneyId)
+  }
+
+  @Get(':tourneyId/rooms')
+  getRooms(
+    @Param('tourneyId') tourneyId: string,
+  ): Promise<ResponseObject<RoomDto[]>> {
+    return this.tournamentsService.getRooms(tourneyId)
+  }
+
+  @Get('active/hub')
+  getActiveTournament(): Promise<
+    ResponseObject<(TournamentDto & { rooms: RoomDto[] }) | null>
+  > {
+    return this.tournamentsService.getActiveTournament()
   }
 }

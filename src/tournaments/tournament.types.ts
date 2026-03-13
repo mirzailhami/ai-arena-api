@@ -24,6 +24,23 @@ export interface TournamentDto {
   maxContestantsPerMatch: number
   advancingContestants: number
   startDate: string
+  roundDurationMinutes: number
+  intermissionMinutes: number
   isActive: boolean
+  status: string
+  publishedAt: string | null
   bracketStructure: TournamentBracket
+}
+
+export interface RoomDto {
+  roomId: string
+  tournamentId: string
+  roundNumber: number
+  contestId: string
+  roomName: string
+  url: string | null
+  status: string
+  scheduledAt: string
+  deployedAt: string | null
+  expiresAt: string | null
 }

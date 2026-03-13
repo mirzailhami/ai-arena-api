@@ -23,17 +23,59 @@ model Problem {
 }
 
 model Tournament {
-  id                     String   @id @default(uuid())
+  id                     String           @id @default(uuid())
   name                   String
   numRounds              Int
   initialEntrants        Int
   maxContestantsPerMatch Int
   advancingContestants   Int
-  startDate              DateTime @default(now())
-  isActive               Boolean  @default(true)
+  startDate              DateTime         @default(now())
+  roundDurationMinutes   Int              @default(60)
+  intermissionMinutes    Int              @default(15)
+  isActive               Boolean          @default(true)
+  status                 TournamentStatus @default(DRAFT)
+  publishedAt            DateTime?
   bracketJson            Json
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+
+  rooms Room[]
 
   @@map("tournaments")
+}
+
+enum TournamentStatus {
+  DRAFT
+  PUBLISHED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum RoomStatus {
+  PENDING
+  DEPLOYING
+  RUNNING
+  STOPPING
+  STOPPED
+  FAILED
+}
+
+model Room {
+  id           String     @id @default(uuid())
+  tournamentId String
+  roundNumber  Int
+  contestId    String
+  roomName     String
+  url          String?
+  status       RoomStatus @default(PENDING)
+  taskArn      String?
+  scheduledAt  DateTime
+  deployedAt   DateTime?
+  expiresAt    DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@map("rooms")
 }

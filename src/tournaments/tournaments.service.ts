@@ -7,7 +7,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { LoggerService } from '../shared/modules/global/logger.service'
 import { CreateTournamentDto } from './dto/create-tournament.dto'
 import { UpdateTournamentDto } from './dto/update-tournament.dto'
-import { TournamentBracket, TournamentDto } from './tournament.types'
+import { RoomDto, TournamentBracket, TournamentDto } from './tournament.types'
 
 @Injectable()
 export class TournamentsService {
@@ -354,12 +354,145 @@ export class TournamentsService {
       advancingContestants: tournament.advancingContestants,
       bracketStructure: bracket,
       initialEntrants: tournament.initialEntrants,
+      intermissionMinutes: tournament.intermissionMinutes,
       isActive: tournament.isActive,
       maxContestantsPerMatch: tournament.maxContestantsPerMatch,
       name: tournament.name,
       numRounds: tournament.numRounds,
+      publishedAt: tournament.publishedAt?.toISOString() ?? null,
+      roundDurationMinutes: tournament.roundDurationMinutes,
       startDate: tournament.startDate.toISOString(),
+      status: tournament.status,
       tourneyId: tournament.id,
     }
+  }
+
+  /**
+   * Publishes a tournament, creating room records and scheduling deployments.
+   * Enforces a single-active-published-tournament constraint.
+   */
+  async publishTournament(
+    tourneyId: string,
+  ): Promise<ResponseObject<TournamentDto | null>> {
+    this.logger.log({ action: 'publishTournament.start', tourneyId })
+
+    const tournament = await this.prisma.tournament.findUnique({
+      where: { id: tourneyId },
+    })
+    if (!tournament) {
+      return responseOf(null, false, `Tournament ID ${tourneyId} not found.`)
+    }
+    if (tournament.status !== 'DRAFT') {
+      return responseOf(
+        null,
+        false,
+        `Tournament is already ${tournament.status.toLowerCase()}.`,
+      )
+    }
+
+    // Enforce single active published tournament
+    const existing = await this.prisma.tournament.findFirst({
+      where: {
+        id: { not: tourneyId },
+        status: { in: ['PUBLISHED', 'IN_PROGRESS'] },
+      },
+    })
+    if (existing) {
+      return responseOf(
+        null,
+        false,
+        `Another tournament ("${existing.name}") is already active. Only one active tournament is allowed.`,
+      )
+    }
+
+    const bracket =
+      (tournament.bracketJson as unknown as TournamentBracket) || { rounds: [] }
+    const startDate = tournament.startDate
+    const roomRecords: Prisma.RoomCreateManyInput[] = []
+    let cumulativeOffsetMs = 0
+
+    for (const round of bracket.rounds) {
+      const roundStartMs = startDate.getTime() + cumulativeOffsetMs
+      for (const contest of round.contests) {
+        const scheduledAt = new Date(roundStartMs)
+        const expiresAt = new Date(
+          roundStartMs + tournament.roundDurationMinutes * 60 * 1000,
+        )
+        roomRecords.push({
+          contestId: contest.contestId,
+          expiresAt,
+          roomName: `${round.roundName} - ${contest.contestId.slice(0, 8)}`,
+          roundNumber: round.roundNumber,
+          scheduledAt,
+          status: 'PENDING',
+          tournamentId: tourneyId,
+        })
+      }
+      cumulativeOffsetMs +=
+        (tournament.roundDurationMinutes + tournament.intermissionMinutes) *
+        60 *
+        1000
+    }
+
+    await this.prisma.room.createMany({ data: roomRecords })
+    const updated = await this.prisma.tournament.update({
+      data: { publishedAt: new Date(), status: 'PUBLISHED' },
+      where: { id: tourneyId },
+    })
+
+    this.logger.log({
+      action: 'publishTournament.finish',
+      roomCount: roomRecords.length,
+      tourneyId,
+    })
+
+    return responseOf(
+      await this.toTournamentDto(updated),
+      true,
+      `Tournament published with ${roomRecords.length} rooms scheduled.`,
+    )
+  }
+
+  /** Returns rooms for a given tournament, optionally filtered by status. */
+  async getRooms(tourneyId: string): Promise<ResponseObject<RoomDto[]>> {
+    const rooms = await this.prisma.room.findMany({
+      orderBy: [{ roundNumber: 'asc' }, { createdAt: 'asc' }],
+      where: { tournamentId: tourneyId },
+    })
+    return responseOf(
+      rooms.map((r) => ({
+        contestId: r.contestId,
+        deployedAt: r.deployedAt?.toISOString() ?? null,
+        expiresAt: r.expiresAt?.toISOString() ?? null,
+        roomId: r.id,
+        roomName: r.roomName,
+        roundNumber: r.roundNumber,
+        scheduledAt: r.scheduledAt.toISOString(),
+        status: r.status,
+        tournamentId: r.tournamentId,
+        url: r.url,
+      })),
+      true,
+      `Retrieved ${rooms.length} rooms.`,
+    )
+  }
+
+  /** Returns the active published tournament with its rooms for the AI Hub page. */
+  async getActiveTournament(): Promise<
+    ResponseObject<(TournamentDto & { rooms: RoomDto[] }) | null>
+  > {
+    const tournament = await this.prisma.tournament.findFirst({
+      where: { status: { in: ['PUBLISHED', 'IN_PROGRESS'] } },
+    })
+    if (!tournament) {
+      return responseOf(null, false, 'No active tournament found.')
+    }
+    const dto = await this.toTournamentDto(tournament)
+    const roomsResponse = await this.getRooms(tournament.id)
+    return responseOf(
+      { ...dto, rooms: roomsResponse.data },
+      true,
+      'Active tournament retrieved.',
+    )
   }
 }
