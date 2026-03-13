@@ -1,0 +1,39 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Problem {
+  id             String   @id @default(uuid())
+  problemName    String
+  zipFileName    String
+  description    String?
+  status         String   @default("Pending Test")
+  isContestReady Boolean  @default(false)
+  isTested       Boolean  @default(false)
+  buildLog       String?
+  uploadedAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("problems")
+}
+
+model Tournament {
+  id                     String   @id @default(uuid())
+  name                   String
+  numRounds              Int
+  initialEntrants        Int
+  maxContestantsPerMatch Int
+  advancingContestants   Int
+  startDate              DateTime @default(now())
+  isActive               Boolean  @default(true)
+  bracketJson            Json
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@map("tournaments")
+}
