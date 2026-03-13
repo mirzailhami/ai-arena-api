@@ -91,11 +91,13 @@ export class FargateService {
 
   /** Gets ECR login credentials for Docker push. */
   async getEcrAuthToken(): Promise<{ endpoint: string; token: string }> {
+    this.logger.log({ action: 'getEcrAuthToken.start' })
     const result = await this.ecr.send(new GetAuthorizationTokenCommand({}))
     const authData = result.authorizationData?.[0]
     if (!authData?.authorizationToken || !authData.proxyEndpoint) {
       throw new Error('Failed to get ECR authorization token')
     }
+    this.logger.log({ action: 'getEcrAuthToken.success', endpoint: authData.proxyEndpoint })
     return {
       endpoint: authData.proxyEndpoint,
       token: authData.authorizationToken,
@@ -143,6 +145,7 @@ export class FargateService {
 
   /** Gets default VPC subnet IDs for Fargate tasks. */
   async getDefaultSubnets(): Promise<string[]> {
+    this.logger.log({ action: 'getDefaultSubnets.start' })
     const vpcs = await this.ec2.send(
       new DescribeVpcsCommand({ Filters: [{ Name: 'isDefault', Values: ['true'] }] }),
     )
@@ -160,6 +163,7 @@ export class FargateService {
     if (!subnetIds.length) {
       throw new Error('No subnets found in default VPC.')
     }
+    this.logger.log({ action: 'getDefaultSubnets.found', count: subnetIds.length, vpcId })
     return subnetIds
   }
 
@@ -287,6 +291,7 @@ export class FargateService {
         error: error instanceof Error ? error.message : String(error),
         serviceName,
       })
+      throw error
     }
   }
 
@@ -364,11 +369,13 @@ export class FargateService {
   }
 
   private async getAccountId(): Promise<string> {
+    this.logger.log({ action: 'getAccountId.start' })
     const { STSClient, GetCallerIdentityCommand } = await import(
       '@aws-sdk/client-sts'
     )
     const sts = new STSClient({ region: this.region })
     const identity = await sts.send(new GetCallerIdentityCommand({}))
+    this.logger.log({ action: 'getAccountId.success', account: identity.Account })
     return identity.Account ?? ''
   }
 

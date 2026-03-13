@@ -4,6 +4,7 @@ import { EventEmitter2, OnEvent } from '@nestjs/event-emitter'
 
 import { PrismaService } from '../prisma/prisma.service'
 import { FargateService } from '../fargate/fargate.service'
+import { ImageBuilderService } from '../fargate/image-builder.service'
 import { LoggerService } from '../shared/modules/global/logger.service'
 
 /** Emitted when a room needs to be deployed (1 hour before scheduled open). */
@@ -24,11 +25,11 @@ interface RoomUndeployPayload {
 @Injectable()
 export class PublishingEngineService {
   private readonly logger = LoggerService.forRoot('PublishingEngine')
-  private imageUri: string | null = null
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly fargate: FargateService,
+    private readonly imageBuilder: ImageBuilderService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -166,16 +167,22 @@ export class PublishingEngineService {
         },
         error instanceof Error ? error.stack : undefined,
       )
+
+      await this.prisma.room.update({
+        data: { status: 'FAILED' },
+        where: { id: roomId },
+      })
     }
   }
 
   /** Resolves the ECR image URI, building and pushing if needed. */
   private async resolveImageUri(): Promise<string> {
-    if (this.imageUri) return this.imageUri
+    const cached = this.imageBuilder.getImageUri()
+    if (cached) return cached
 
-    const repoUri = await this.fargate.ensureEcrRepository()
-    this.imageUri = `${repoUri}:latest`
-    return this.imageUri
+    const arenaSourceDir =
+      process.env.ARENA_SOURCE_DIR || './data/arena-source'
+    return this.imageBuilder.buildAndPush(arenaSourceDir)
   }
 
   /** Checks if all rooms for a tournament are done, marks it COMPLETED. */

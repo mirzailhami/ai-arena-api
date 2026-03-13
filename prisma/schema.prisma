@@ -41,6 +41,7 @@ model Tournament {
 
   rooms Room[]
 
+  @@index([status])
   @@map("tournaments")
 }
 
@@ -77,5 +78,8 @@ model Room {
 
   tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
+  @@index([status, scheduledAt])
+  @@index([status, expiresAt])
+  @@index([tournamentId])
   @@map("rooms")
 }
