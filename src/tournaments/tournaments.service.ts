@@ -36,6 +36,15 @@ export class TournamentsService {
         maxContestantsPerMatch: payload.maxContestantsPerMatch,
         name: payload.name,
         numRounds: payload.numRounds,
+        ...(payload.startDate && {
+          startDate: new Date(payload.startDate),
+        }),
+        ...(payload.roundDurationMinutes != null && {
+          roundDurationMinutes: payload.roundDurationMinutes,
+        }),
+        ...(payload.intermissionMinutes != null && {
+          intermissionMinutes: payload.intermissionMinutes,
+        }),
       },
     })
     this.logger.log({
@@ -80,6 +89,12 @@ export class TournamentsService {
         name: payload.name,
         numRounds: payload.numRounds,
         startDate: new Date(payload.startDate),
+        ...(payload.roundDurationMinutes != null && {
+          roundDurationMinutes: payload.roundDurationMinutes,
+        }),
+        ...(payload.intermissionMinutes != null && {
+          intermissionMinutes: payload.intermissionMinutes,
+        }),
       },
       where: { id: tourneyId },
     })

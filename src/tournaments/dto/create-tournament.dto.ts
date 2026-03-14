@@ -1,4 +1,11 @@
-import { IsInt, IsNotEmpty, IsString, Min } from 'class-validator'
+import {
+  IsDateString,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator'
 
 export class CreateTournamentDto {
   @IsString()
@@ -20,4 +27,18 @@ export class CreateTournamentDto {
   @IsInt()
   @Min(1)
   advancingContestants!: number
+
+  @IsOptional()
+  @IsDateString()
+  startDate?: string
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  roundDurationMinutes?: number
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  intermissionMinutes?: number
 }

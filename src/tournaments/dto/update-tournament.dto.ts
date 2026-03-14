@@ -3,6 +3,7 @@ import {
   IsInt,
   IsNotEmpty,
   IsObject,
+  IsOptional,
   IsString,
   Min,
 } from 'class-validator'
@@ -35,6 +36,16 @@ export class UpdateTournamentDto {
   @IsString()
   @IsNotEmpty()
   startDate!: string
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  roundDurationMinutes?: number
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  intermissionMinutes?: number
 
   @IsBoolean()
   isActive!: boolean
