@@ -113,6 +113,7 @@ export class PublishingEngineService implements OnModuleInit, OnModuleDestroy {
   async reconcileScheduledRooms(): Promise<void> {
     const now = new Date()
     const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000)
+    const sqsAvailable = this.sqsService.isAvailable()
 
     // Find PENDING rooms that should have been deployed by now
     const missedRooms = await this.prisma.room.findMany({
@@ -128,7 +129,20 @@ export class PublishingEngineService implements OnModuleInit, OnModuleDestroy {
         roomId: room.id,
         scheduledAt: room.scheduledAt.toISOString(),
       })
-      await this.sqsService.sendMessage({ action: 'DEPLOY', roomId: room.id })
+      if (sqsAvailable) {
+        await this.sqsService.sendMessage({ action: 'DEPLOY', roomId: room.id })
+      } else {
+        // Direct deploy when SQS is unavailable
+        try {
+          await this.handleRoomDeploy(room.id)
+        } catch (error) {
+          this.logger.error({
+            action: 'reconcile.directDeployFailed',
+            error: error instanceof Error ? error.message : String(error),
+            roomId: room.id,
+          })
+        }
+      }
     }
 
     // Find RUNNING rooms that have expired
@@ -144,7 +158,19 @@ export class PublishingEngineService implements OnModuleInit, OnModuleDestroy {
         action: 'reconcile.undeployMissed',
         roomId: room.id,
       })
-      await this.sqsService.sendMessage({ action: 'UNDEPLOY', roomId: room.id })
+      if (sqsAvailable) {
+        await this.sqsService.sendMessage({ action: 'UNDEPLOY', roomId: room.id })
+      } else {
+        try {
+          await this.handleRoomUndeploy(room.id)
+        } catch (error) {
+          this.logger.error({
+            action: 'reconcile.directUndeployFailed',
+            error: error instanceof Error ? error.message : String(error),
+            roomId: room.id,
+          })
+        }
+      }
     }
 
     // Check tournament completion

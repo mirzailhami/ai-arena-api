@@ -87,7 +87,10 @@ SCHEDULER_ROLE_ARN=
 
 ## Local run
 
+Before starting, ensure `ARENA_SOURCE_DIR` points to a real folder containing `Dockerfile`.
+
 ```bash
+ls "$ARENA_SOURCE_DIR"/Dockerfile
 pnpm install
 pnpm prisma:generate
 pnpm prisma:migrate:dev
@@ -104,6 +107,9 @@ http://localhost:3008/v6
 
 For local review with bundled Postgres:
 
+1. In `.env`, set `ARENA_SOURCE_DIR` to the **absolute path** of the folder containing the arena `Dockerfile`.
+2. Run compose:
+
 ```bash
 docker compose up --build
 ```
@@ -112,6 +118,8 @@ This starts:
 
 - Postgres on `localhost:5432`
 - `ai-arena-api` on `localhost:3008`
+
+Compose mounts `ARENA_SOURCE_DIR` into the container at the same path, so the same value works for both local and Docker runs.
 
 The compose setup mounts the host Docker socket into `ai-arena-api` so uploaded problems can still be validated with `docker build` / `docker run`.
 Problem data is stored in a named Docker volume (`ai-arena-data`) to avoid slow unzip/build I/O on host bind mounts.

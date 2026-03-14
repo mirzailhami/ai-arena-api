@@ -36,6 +36,7 @@ export class SqsService implements OnModuleInit {
   private readonly dlqName: string
   private queueUrl: string | null = null
   private dlqArn: string | null = null
+  private available = false
 
   constructor() {
     const region = process.env.AWS_REGION || 'us-east-1'
@@ -45,7 +46,21 @@ export class SqsService implements OnModuleInit {
   }
 
   async onModuleInit(): Promise<void> {
-    await this.ensureQueues()
+    try {
+      await this.ensureQueues()
+      this.available = true
+    } catch (error) {
+      this.logger.warn({
+        action: 'onModuleInit.sqsUnavailable',
+        error: error instanceof Error ? error.message : String(error),
+        message: 'SQS queues not available — reconciliation cron will handle deployments directly',
+      })
+    }
+  }
+
+  /** Returns true if SQS is available for message processing. */
+  isAvailable(): boolean {
+    return this.available
   }
 
   /** Creates the DLQ and main queue (with redrive policy) if they don't exist. */
