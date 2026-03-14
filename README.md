@@ -7,9 +7,10 @@ Backend service for the AI Arena — problem library, tournament bracket generat
 - TypeScript / NestJS 11
 - PostgreSQL / Prisma 7
 - pnpm 10
-- AWS SDK v3 (ECS, ECR, EC2, CloudWatch Logs, STS, IAM)
-- `@nestjs/schedule` (cron-based publishing timer)
-- `@nestjs/event-emitter` (internal event bus)
+- AWS SDK v3 (ECS, ECR, EC2, CloudWatch Logs, STS, IAM, SQS, EventBridge Scheduler)
+- `@nestjs/schedule` (reconciliation cron)
+- Amazon SQS (reliable deployment message queue with DLQ)
+- Amazon EventBridge Scheduler (precise one-time room deployment triggers)
 
 ## API base
 
@@ -58,6 +59,14 @@ CONTAINER_PORT=8080
 # Arena container config
 GEMINI_API_KEY=<your-gemini-key>
 ARENA_SOURCE_DIR=<path-to-ai-arena-develop-folder>
+
+# SQS Deployment Queue (auto-created if not exists)
+SQS_QUEUE_NAME=ai-arena-deployment
+SQS_DLQ_NAME=ai-arena-deployment-dlq
+
+# EventBridge Scheduler (optional — cron reconciliation covers if unset)
+SQS_QUEUE_ARN=
+SCHEDULER_ROLE_ARN=
 ```
 
 ### Key variables
@@ -71,6 +80,10 @@ ARENA_SOURCE_DIR=<path-to-ai-arena-develop-folder>
 | `CONTAINER_PORT` | Port exposed by the arena container (default: `8080`) |
 | `GEMINI_API_KEY` | *(Optional)* API key passed to arena containers as env var |
 | `ARENA_SOURCE_DIR` | Path to the `ai-arena-develop` folder containing `Dockerfile` and arena source |
+| `SQS_QUEUE_NAME` | SQS deployment queue name (default: `ai-arena-deployment`, auto-created) |
+| `SQS_DLQ_NAME` | SQS dead-letter queue name (default: `ai-arena-deployment-dlq`, auto-created) |
+| `SQS_QUEUE_ARN` | *(Optional)* SQS queue ARN for EventBridge Scheduler target |
+| `SCHEDULER_ROLE_ARN` | *(Optional)* IAM role ARN for EventBridge Scheduler to send SQS messages |
 
 ## Local run
 
@@ -107,7 +120,7 @@ Problem data is stored in a named Docker volume (`ai-arena-data`) to avoid slow 
 
 ```
 src/
-├── app.module.ts              # Root module (Config, Schedule, EventEmitter, Prisma, etc.)
+├── app.module.ts              # Root module (Config, Schedule, Prisma, etc.)
 ├── main.ts                    # Bootstrap + Swagger + global prefix
 ├── common/                    # Shared decorators, pipes
 ├── prisma/                    # PrismaModule + PrismaService
@@ -117,7 +130,9 @@ src/
 │   ├── fargate.service.ts     # ECS/ECR/EC2 cluster/task/repo management
 │   └── image-builder.service.ts # Docker build + ECR push
 ├── publishing/                # Publishing engine
-│   └── publishing-engine.service.ts # Cron scheduler + event handlers
+│   ├── publishing-engine.service.ts # SQS consumer + reconciliation cron
+│   ├── sqs.service.ts         # SQS queue management (deployment queue + DLQ)
+│   └── scheduler.service.ts   # EventBridge Scheduler (one-time deployment triggers)
 └── shared/                    # Auth guards, JWT strategy
 ```
 
@@ -125,12 +140,16 @@ src/
 
 1. Admin configures tournament (start date, round duration, intermission) and clicks **Publish**
 2. Backend creates `Room` records for every contest, calculating `scheduledAt` and `expiresAt`
-3. Cron job runs every minute:
-   - Finds PENDING rooms whose `scheduledAt` is within 1 hour → emits `room.deploy`
-   - Finds RUNNING rooms past `expiresAt` → emits `room.undeploy`
-4. `room.deploy` handler: builds arena Docker image (cached after first build), pushes to ECR, deploys Fargate task, polls for public IP, saves URL
-5. `room.undeploy` handler: stops Fargate task, clears room URL
-6. When all rooms are STOPPED, tournament is marked COMPLETED
+3. **EventBridge Scheduler** creates a one-time schedule per room, firing at `scheduledAt – 1 hour`
+4. When the schedule fires, it sends a `DEPLOY` message to the **SQS deployment queue**
+5. **SQS consumer** (polling every 10s) picks up the message and deploys the room:
+   - Builds arena Docker image (cached after first build), pushes to ECR
+   - Deploys Fargate task, polls for public IP, saves URL
+   - On success: deletes the SQS message
+   - On failure: message returns to queue after visibility timeout (3 retries → DLQ)
+6. **Reconciliation cron** (every 5 min) catches any rooms missed by EventBridge/SQS
+7. Expired RUNNING rooms receive `UNDEPLOY` messages → Fargate tasks are stopped
+8. When all rooms are STOPPED/FAILED, tournament is marked COMPLETED
 
 ## AWS Setup
 
@@ -143,11 +162,14 @@ The IAM user needs these managed policies:
 - `AmazonEC2ContainerRegistryFullAccess`
 - `AmazonVPCReadOnlyAccess`
 - `CloudWatchLogsFullAccess`
+- `AmazonSQSFullAccess`
+- `AmazonEventBridgeSchedulerFullAccess` *(optional — only needed if using EventBridge Scheduler)*
 
 The backend auto-creates:
 - ECR repository (if not exists)
 - ECS cluster (if not exists)
 - CloudWatch log group (if not exists)
+- SQS deployment queue with Dead Letter Queue (if not exists)
 
 **Manual setup required:**
 - ECS task execution role (`ecsTaskExecutionRole`) — must be created manually in IAM Console (trusted entity: ECS Tasks, attach `AmazonECSTaskExecutionRolePolicy`)
@@ -175,7 +197,7 @@ docker exec ai-arena-postgres psql -U postgres -d ai_arena_api \
 bash scripts/smoke-test.sh
 ```
 
-The script prints pass/fail for each check and a summary at the end. After completion, the cron scheduler (runs every 60s) will deploy rooms to AWS Fargate. Monitor with:
+The script prints pass/fail for each check and a summary at the end. After completion, the SQS-based publishing engine will deploy rooms to AWS Fargate (triggered by EventBridge Scheduler or reconciliation cron). Monitor with:
 
 ```bash
 curl -s http://localhost:3008/v6/tourney/<tourneyId>/rooms \

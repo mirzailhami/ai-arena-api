@@ -26,6 +26,8 @@ Step-by-step guide for setting up the AI Arena backend with AWS Fargate room pro
    - `AmazonEC2ContainerRegistryFullAccess`
    - `AmazonVPCReadOnlyAccess`
    - `CloudWatchLogsFullAccess`
+   - `AmazonSQSFullAccess`
+   - `AmazonEventBridgeSchedulerFullAccess` *(optional — only needed if using EventBridge Scheduler)*
 5. Additionally, ensure the user has `sts:GetCallerIdentity` permission (included in most default policies)
 6. Create an **Access Key** (CLI use case)
 6. Save the Access Key ID and Secret Access Key
@@ -56,13 +58,39 @@ The IAM deployer user typically lacks `iam:CreateRole` permissions, so this role
 
 The trust policy should allow `ecs-tasks.amazonaws.com` to assume the role (this is set automatically when choosing the ECS Task use case above).
 
-### 1.4 Auto-Created Resources
+### 1.4 EventBridge Scheduler Role (Optional)
+
+If using EventBridge Scheduler for precise room deployment triggers:
+
+1. Navigate to **IAM → Roles → Create role**
+2. Trusted entity type: **AWS service**
+3. Use case: **EventBridge Scheduler**
+4. Role name: `ai-arena-scheduler-role`
+5. Create an inline policy allowing `sqs:SendMessage` on the deployment queue:
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [{
+       "Effect": "Allow",
+       "Action": "sqs:SendMessage",
+       "Resource": "arn:aws:sqs:us-east-1:<account-id>:ai-arena-deployment"
+     }]
+   }
+   ```
+6. Copy the Role ARN into `.env` as `SCHEDULER_ROLE_ARN`
+7. Copy the SQS queue ARN into `.env` as `SQS_QUEUE_ARN`
+
+> **Note:** EventBridge Scheduler is optional. Without it, the reconciliation cron (every 5 min) handles all deployments.
+
+### 1.5 Auto-Created Resources
 
 The backend automatically creates these AWS resources on first use:
 - **ECR Repository** (`ai-arena`) — stores the arena Docker image
 - **ECS Cluster** (`ai-arena-cluster`) — runs Fargate tasks
 - **CloudWatch Log Group** (`/ecs/ai-arena-room`) — collects container logs
 - **Security Group** (`ai-arena-fargate-sg`) — allows inbound traffic on port 8080
+- **SQS Queue** (`ai-arena-deployment`) — deployment message queue
+- **SQS Dead Letter Queue** (`ai-arena-deployment-dlq`) — failed deployment messages (retained 14 days)
 
 ---
 
@@ -111,6 +139,14 @@ GEMINI_API_KEY=           # optional — passed to arena containers
 
 # Path to the ai-arena-develop folder (contains Dockerfile for arena WAR)
 ARENA_SOURCE_DIR=/path/to/ai-arena-develop/ai-arena-develop
+
+# SQS Deployment Queue (auto-created if not exists)
+SQS_QUEUE_NAME=ai-arena-deployment
+SQS_DLQ_NAME=ai-arena-deployment-dlq
+
+# EventBridge Scheduler (optional — cron reconciliation covers if unset)
+SQS_QUEUE_ARN=
+SCHEDULER_ROLE_ARN=
 ```
 
 ### 2.3 Start Database
@@ -198,7 +234,7 @@ Access at `https://local.topcoder-dev.com/arena-manager/ai-hub`
 
 ### 4.3 Verify Fargate Deployment
 
-1. The publishing engine cron runs every minute
+1. The publishing engine deploys rooms via SQS messages (triggered by EventBridge Scheduler or reconciliation cron every 5 min)
 2. Rooms are deployed 1 hour before their `scheduledAt` time
 3. Monitor backend logs for deployment events:
    ```
@@ -233,7 +269,8 @@ Access at `https://local.topcoder-dev.com/arena-manager/ai-hub`
 ### Room links not appearing in AI Hub
 
 - Check that the tournament status is `PUBLISHED` or `IN_PROGRESS`
-- Verify the cron is running (look for `[PublishingEngine]` log entries every minute)
+- Verify the SQS consumer is running (look for `[PublishingEngine]` log entries)
+- Check the reconciliation cron is running (logs every 5 minutes)
 - Room links only appear when `status = RUNNING` and `url` is set
 
 ### ECR authentication fails
@@ -265,3 +302,5 @@ Access at `https://local.topcoder-dev.com/arena-manager/ai-hub`
 - ECR images are cached after first build
 - All resources are in a single region to minimize data transfer costs
 - On AWS free tier: 750 hours/month of Fargate (Linux, ARM or x86)
+- SQS: 1 million free requests/month (well within arena usage)
+- EventBridge Scheduler: 14 million free invocations/month
