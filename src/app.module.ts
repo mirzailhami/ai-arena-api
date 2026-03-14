@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common'
 import { ScheduleModule } from '@nestjs/schedule'
-import { EventEmitterModule } from '@nestjs/event-emitter'
 import { ConfigModule } from '@nestjs/config'
 
 import { PrismaModule } from './prisma/prisma.module'
@@ -12,7 +11,6 @@ import { PublishingModule } from './publishing/publishing.module'
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
-    EventEmitterModule.forRoot(),
     PrismaModule,
     ProblemsModule,
     TournamentsModule,

@@ -8,6 +8,7 @@ import { randomUUID } from 'crypto'
 
 import { ResponseObject, responseOf } from '../common/api-response'
 import { PrismaService } from '../prisma/prisma.service'
+import { PublishingEngineService } from '../publishing/publishing-engine.service'
 import { LoggerService } from '../shared/modules/global/logger.service'
 import { CreateTournamentDto } from './dto/create-tournament.dto'
 import { UpdateTournamentDto } from './dto/update-tournament.dto'
@@ -17,7 +18,10 @@ import { RoomDto, TournamentBracket, TournamentDto } from './tournament.types'
 export class TournamentsService {
   private readonly logger = LoggerService.forRoot('TournamentsService')
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly publishingEngine: PublishingEngineService,
+  ) {}
 
   async createTournament(
     payload: CreateTournamentDto,
@@ -435,6 +439,18 @@ export class TournamentsService {
     }
 
     await this.prisma.room.createMany({ data: roomRecords })
+
+    // Query back the created rooms to get their generated IDs
+    const createdRooms = await this.prisma.room.findMany({
+      select: { id: true, scheduledAt: true },
+      where: { tournamentId: tourneyId },
+    })
+
+    // Create EventBridge Scheduler entries for each room
+    await this.publishingEngine.scheduleRoomDeployments(
+      createdRooms.map((r) => ({ roomId: r.id, scheduledAt: r.scheduledAt })),
+    )
+
     const updated = await this.prisma.tournament.update({
       data: { publishedAt: new Date(), status: 'PUBLISHED' },
       where: { id: tourneyId },

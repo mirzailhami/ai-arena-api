@@ -1,113 +1,204 @@
-import { Injectable } from '@nestjs/common'
-import { Cron, CronExpression } from '@nestjs/schedule'
-import { EventEmitter2, OnEvent } from '@nestjs/event-emitter'
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
+import { Cron } from '@nestjs/schedule'
 
 import { PrismaService } from '../prisma/prisma.service'
 import { FargateService } from '../fargate/fargate.service'
 import { ImageBuilderService } from '../fargate/image-builder.service'
 import { LoggerService } from '../shared/modules/global/logger.service'
-
-/** Emitted when a room needs to be deployed (1 hour before scheduled open). */
-export const ROOM_DEPLOY_EVENT = 'room.deploy'
-
-/** Emitted when a room has expired and should be undeployed. */
-export const ROOM_UNDEPLOY_EVENT = 'room.undeploy'
-
-interface RoomDeployPayload {
-  roomId: string
-  securityGroupId: string
-  taskDefinitionArn: string
-}
-
-interface RoomUndeployPayload {
-  roomId: string
-}
+import { SqsService, type RoomMessage } from './sqs.service'
+import { SchedulerService } from './scheduler.service'
 
 @Injectable()
-export class PublishingEngineService {
+export class PublishingEngineService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = LoggerService.forRoot('PublishingEngine')
+  private consumerRunning = false
+  private consumerTimer: ReturnType<typeof setInterval> | null = null
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly fargate: FargateService,
     private readonly imageBuilder: ImageBuilderService,
-    private readonly eventEmitter: EventEmitter2,
+    private readonly sqsService: SqsService,
+    private readonly schedulerService: SchedulerService,
   ) {}
 
-  /**
-   * Cron job that runs every minute to check for rooms that need
-   * to be deployed (1 hour before opening) or undeployed (expired).
-   */
-  @Cron(CronExpression.EVERY_MINUTE)
-  async checkScheduledRooms(): Promise<void> {
+  async onModuleInit(): Promise<void> {
+    this.startConsumer()
+  }
+
+  onModuleDestroy(): void {
+    this.stopConsumer()
+  }
+
+  // ---------------------------------------------------------------------------
+  // SQS Consumer — polls deployment queue and processes messages
+  // ---------------------------------------------------------------------------
+
+  private startConsumer(): void {
+    this.consumerRunning = true
+    this.consumerTimer = setInterval(() => {
+      void this.pollMessages()
+    }, 10_000) // poll every 10 seconds
+    this.logger.log({ action: 'sqsConsumer.started' })
+  }
+
+  private stopConsumer(): void {
+    this.consumerRunning = false
+    if (this.consumerTimer) {
+      clearInterval(this.consumerTimer)
+      this.consumerTimer = null
+    }
+    this.logger.log({ action: 'sqsConsumer.stopped' })
+  }
+
+  private async pollMessages(): Promise<void> {
+    if (!this.consumerRunning) return
+    try {
+      const messages = await this.sqsService.receiveMessages()
+      for (const msg of messages) {
+        await this.processMessage(msg.body, msg.receiptHandle)
+      }
+    } catch (error) {
+      this.logger.error(
+        {
+          action: 'sqsConsumer.pollError',
+          error: error instanceof Error ? error.message : String(error),
+        },
+        error instanceof Error ? error.stack : undefined,
+      )
+    }
+  }
+
+  private async processMessage(
+    message: RoomMessage,
+    receiptHandle: string,
+  ): Promise<void> {
+    this.logger.log({
+      action: 'processMessage.start',
+      messageAction: message.action,
+      roomId: message.roomId,
+    })
+
+    try {
+      if (message.action === 'DEPLOY') {
+        await this.handleRoomDeploy(message.roomId)
+      } else if (message.action === 'UNDEPLOY') {
+        await this.handleRoomUndeploy(message.roomId)
+      }
+
+      // Delete the message on success — if we crash before this,
+      // SQS will redeliver after the visibility timeout expires
+      await this.sqsService.deleteMessage(receiptHandle)
+    } catch (error) {
+      // Don't delete the message — SQS will retry after visibility timeout.
+      // After maxReceiveCount (3) failures it moves to the DLQ.
+      this.logger.error(
+        {
+          action: 'processMessage.failed',
+          error: error instanceof Error ? error.message : String(error),
+          messageAction: message.action,
+          roomId: message.roomId,
+        },
+        error instanceof Error ? error.stack : undefined,
+      )
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Reconciliation cron — defense-in-depth fallback (every 5 minutes)
+  // Catches rooms that EventBridge Scheduler or SQS somehow missed.
+  // ---------------------------------------------------------------------------
+
+  @Cron('*/5 * * * *')
+  async reconcileScheduledRooms(): Promise<void> {
     const now = new Date()
     const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000)
 
-    // Find rooms that should be deployed (scheduled within the next hour, still PENDING)
-    const roomsToDeploy = await this.prisma.room.findMany({
+    // Find PENDING rooms that should have been deployed by now
+    const missedRooms = await this.prisma.room.findMany({
       where: {
         scheduledAt: { lte: oneHourFromNow },
         status: 'PENDING',
       },
     })
 
-    if (roomsToDeploy.length > 0) {
-      // Mark all as DEPLOYING immediately to prevent duplicate triggers on next cron tick
-      await this.prisma.room.updateMany({
-        data: { status: 'DEPLOYING' },
-        where: { id: { in: roomsToDeploy.map((r) => r.id) } },
+    for (const room of missedRooms) {
+      this.logger.warn({
+        action: 'reconcile.deployMissed',
+        roomId: room.id,
+        scheduledAt: room.scheduledAt.toISOString(),
       })
-
-      // Resolve image URI once (may trigger Docker build on first call)
-      const imageUri = await this.resolveImageUri()
-
-      // Register ECS task definition and security group once for all rooms
-      const geminiApiKey = process.env.GEMINI_API_KEY || ''
-      const taskDefinitionArn = await this.fargate.registerTaskDefinition(imageUri, geminiApiKey)
-      const securityGroupId = await this.fargate.ensureSecurityGroup()
-
-      for (const room of roomsToDeploy) {
-        this.logger.log({
-          action: 'checkScheduledRooms.triggerDeploy',
-          roomId: room.id,
-          scheduledAt: room.scheduledAt.toISOString(),
-        })
-        this.eventEmitter.emit(ROOM_DEPLOY_EVENT, {
-          securityGroupId,
-          taskDefinitionArn,
-          roomId: room.id,
-        } satisfies RoomDeployPayload)
-      }
+      await this.sqsService.sendMessage({ action: 'DEPLOY', roomId: room.id })
     }
 
-    // Find rooms that have expired and should be undeployed
-    const roomsToUndeploy = await this.prisma.room.findMany({
+    // Find RUNNING rooms that have expired
+    const expiredRooms = await this.prisma.room.findMany({
       where: {
         expiresAt: { lte: now },
         status: 'RUNNING',
       },
     })
 
-    for (const room of roomsToUndeploy) {
-      this.logger.log({
-        action: 'checkScheduledRooms.triggerUndeploy',
+    for (const room of expiredRooms) {
+      this.logger.warn({
+        action: 'reconcile.undeployMissed',
         roomId: room.id,
       })
-      this.eventEmitter.emit(ROOM_UNDEPLOY_EVENT, {
-        roomId: room.id,
-      } satisfies RoomUndeployPayload)
+      await this.sqsService.sendMessage({ action: 'UNDEPLOY', roomId: room.id })
     }
 
-    // Check if all rooms are stopped/failed → mark tournament as COMPLETED
+    // Check tournament completion
     await this.checkTournamentCompletion()
   }
 
-  @OnEvent(ROOM_DEPLOY_EVENT)
-  async handleRoomDeploy(payload: RoomDeployPayload): Promise<void> {
-    const { securityGroupId, taskDefinitionArn, roomId } = payload
+  // ---------------------------------------------------------------------------
+  // Called by TournamentsService at publish time to create EventBridge schedules
+  // ---------------------------------------------------------------------------
+
+  async scheduleRoomDeployments(
+    rooms: Array<{ roomId: string; scheduledAt: Date }>,
+  ): Promise<void> {
+    for (const room of rooms) {
+      const fireAt = new Date(room.scheduledAt.getTime() - 60 * 60 * 1000)
+      await this.schedulerService.scheduleRoomDeployment(room.roomId, fireAt)
+    }
+    this.logger.log({
+      action: 'scheduleRoomDeployments.complete',
+      roomCount: rooms.length,
+    })
+  }
+
+  // ---------------------------------------------------------------------------
+  // Room deployment / undeployment handlers
+  // ---------------------------------------------------------------------------
+
+  private async handleRoomDeploy(roomId: string): Promise<void> {
     this.logger.log({ action: 'handleRoomDeploy.start', roomId })
 
+    // Idempotency: skip if already deployed or deploying
+    const room = await this.prisma.room.findUnique({ where: { id: roomId } })
+    if (!room || room.status !== 'PENDING') {
+      this.logger.log({
+        action: 'handleRoomDeploy.skip',
+        currentStatus: room?.status,
+        roomId,
+      })
+      return
+    }
+
+    // Mark as DEPLOYING to prevent duplicate processing
+    await this.prisma.room.update({
+      data: { status: 'DEPLOYING' },
+      where: { id: roomId },
+    })
+
     try {
+      // Resolve image, register task definition, ensure security group
+      const imageUri = await this.resolveImageUri()
+      const geminiApiKey = process.env.GEMINI_API_KEY || ''
+      const taskDefinitionArn = await this.fargate.registerTaskDefinition(imageUri, geminiApiKey)
+      const securityGroupId = await this.fargate.ensureSecurityGroup()
+
       const result = await this.fargate.deployRoom(roomId, taskDefinitionArn, securityGroupId)
 
       await this.prisma.room.update({
@@ -121,13 +212,10 @@ export class PublishingEngineService {
       })
 
       // Mark tournament as IN_PROGRESS once first room is deployed
-      const room = await this.prisma.room.findUnique({ where: { id: roomId } })
-      if (room) {
-        await this.prisma.tournament.updateMany({
-          data: { status: 'IN_PROGRESS' },
-          where: { id: room.tournamentId, status: 'PUBLISHED' },
-        })
-      }
+      await this.prisma.tournament.updateMany({
+        data: { status: 'IN_PROGRESS' },
+        where: { id: room.tournamentId, status: 'PUBLISHED' },
+      })
 
       this.logger.log({
         action: 'handleRoomDeploy.success',
@@ -148,13 +236,24 @@ export class PublishingEngineService {
         data: { status: 'FAILED' },
         where: { id: roomId },
       })
+
+      // Re-throw so the SQS message is NOT deleted and can be retried
+      throw error
     }
   }
 
-  @OnEvent(ROOM_UNDEPLOY_EVENT)
-  async handleRoomUndeploy(payload: RoomUndeployPayload): Promise<void> {
-    const { roomId } = payload
+  private async handleRoomUndeploy(roomId: string): Promise<void> {
     this.logger.log({ action: 'handleRoomUndeploy.start', roomId })
+
+    const room = await this.prisma.room.findUnique({ where: { id: roomId } })
+    if (!room || room.status !== 'RUNNING') {
+      this.logger.log({
+        action: 'handleRoomUndeploy.skip',
+        currentStatus: room?.status,
+        roomId,
+      })
+      return
+    }
 
     try {
       await this.prisma.room.update({
@@ -184,6 +283,8 @@ export class PublishingEngineService {
         data: { status: 'FAILED' },
         where: { id: roomId },
       })
+
+      throw error
     }
   }
 
