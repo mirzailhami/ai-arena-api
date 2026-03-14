@@ -15,7 +15,8 @@ export const ROOM_UNDEPLOY_EVENT = 'room.undeploy'
 
 interface RoomDeployPayload {
   roomId: string
-  imageUri: string
+  securityGroupId: string
+  taskDefinitionArn: string
 }
 
 interface RoomUndeployPayload {
@@ -50,16 +51,33 @@ export class PublishingEngineService {
       },
     })
 
-    for (const room of roomsToDeploy) {
-      this.logger.log({
-        action: 'checkScheduledRooms.triggerDeploy',
-        roomId: room.id,
-        scheduledAt: room.scheduledAt.toISOString(),
+    if (roomsToDeploy.length > 0) {
+      // Mark all as DEPLOYING immediately to prevent duplicate triggers on next cron tick
+      await this.prisma.room.updateMany({
+        data: { status: 'DEPLOYING' },
+        where: { id: { in: roomsToDeploy.map((r) => r.id) } },
       })
-      this.eventEmitter.emit(ROOM_DEPLOY_EVENT, {
-        imageUri: await this.resolveImageUri(),
-        roomId: room.id,
-      } satisfies RoomDeployPayload)
+
+      // Resolve image URI once (may trigger Docker build on first call)
+      const imageUri = await this.resolveImageUri()
+
+      // Register ECS task definition and security group once for all rooms
+      const geminiApiKey = process.env.GEMINI_API_KEY || ''
+      const taskDefinitionArn = await this.fargate.registerTaskDefinition(imageUri, geminiApiKey)
+      const securityGroupId = await this.fargate.ensureSecurityGroup()
+
+      for (const room of roomsToDeploy) {
+        this.logger.log({
+          action: 'checkScheduledRooms.triggerDeploy',
+          roomId: room.id,
+          scheduledAt: room.scheduledAt.toISOString(),
+        })
+        this.eventEmitter.emit(ROOM_DEPLOY_EVENT, {
+          securityGroupId,
+          taskDefinitionArn,
+          roomId: room.id,
+        } satisfies RoomDeployPayload)
+      }
     }
 
     // Find rooms that have expired and should be undeployed
@@ -86,17 +104,11 @@ export class PublishingEngineService {
 
   @OnEvent(ROOM_DEPLOY_EVENT)
   async handleRoomDeploy(payload: RoomDeployPayload): Promise<void> {
-    const { imageUri, roomId } = payload
+    const { securityGroupId, taskDefinitionArn, roomId } = payload
     this.logger.log({ action: 'handleRoomDeploy.start', roomId })
 
     try {
-      await this.prisma.room.update({
-        data: { status: 'DEPLOYING' },
-        where: { id: roomId },
-      })
-
-      const geminiApiKey = process.env.GEMINI_API_KEY || ''
-      const result = await this.fargate.deployRoom(roomId, imageUri, geminiApiKey)
+      const result = await this.fargate.deployRoom(roomId, taskDefinitionArn, securityGroupId)
 
       await this.prisma.room.update({
         data: {

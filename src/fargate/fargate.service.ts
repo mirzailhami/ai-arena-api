@@ -167,22 +167,77 @@ export class FargateService {
     return subnetIds
   }
 
+  /** Ensures a security group exists that allows inbound traffic on the container port. */
+  async ensureSecurityGroup(): Promise<string> {
+    const sgName = 'ai-arena-fargate-sg'
+    const { DescribeSecurityGroupsCommand, CreateSecurityGroupCommand, AuthorizeSecurityGroupIngressCommand } =
+      await import('@aws-sdk/client-ec2')
+
+    try {
+      const existing = await this.ec2.send(
+        new DescribeSecurityGroupsCommand({
+          Filters: [{ Name: 'group-name', Values: [sgName] }],
+        }),
+      )
+      const sg = existing.SecurityGroups?.[0]
+      if (sg?.GroupId) {
+        this.logger.log({ action: 'ensureSecurityGroup.exists', sgId: sg.GroupId })
+        return sg.GroupId
+      }
+    } catch {
+      // Doesn't exist
+    }
+
+    // Get default VPC ID
+    const vpcs = await this.ec2.send(
+      new DescribeVpcsCommand({ Filters: [{ Name: 'isDefault', Values: ['true'] }] }),
+    )
+    const vpcId = vpcs.Vpcs?.[0]?.VpcId
+    if (!vpcId) {
+      throw new Error('No default VPC found.')
+    }
+
+    const created = await this.ec2.send(
+      new CreateSecurityGroupCommand({
+        Description: 'Security group for AI Arena Fargate tasks',
+        GroupName: sgName,
+        VpcId: vpcId,
+      }),
+    )
+    const sgId = created.GroupId!
+
+    await this.ec2.send(
+      new AuthorizeSecurityGroupIngressCommand({
+        GroupId: sgId,
+        IpPermissions: [
+          {
+            FromPort: this.containerPort,
+            IpProtocol: 'tcp',
+            IpRanges: [{ CidrIp: '0.0.0.0/0', Description: 'Arena container port' }],
+            ToPort: this.containerPort,
+          },
+        ],
+      }),
+    )
+
+    this.logger.log({ action: 'ensureSecurityGroup.created', sgId })
+    return sgId
+  }
+
   /**
-   * Deploys a container to Fargate for a specific room.
-   * Returns the public URL pointing to arena.html.
+   * Registers a Fargate task definition for the arena container.
+   * Call this once before deploying multiple rooms to avoid concurrent
+   * RegisterTaskDefinition requests which cause ECS throttling.
    */
-  async deployRoom(
-    roomId: string,
+  async registerTaskDefinition(
     imageUri: string,
     geminiApiKey: string,
-  ): Promise<DeployResult> {
-    this.logger.log({ action: 'deployRoom.start', imageUri, roomId })
-    const serviceName = `arena-room-${roomId.slice(0, 8)}`
+  ): Promise<string> {
+    this.logger.log({ action: 'registerTaskDefinition.start', imageUri })
 
     await this.ensureCluster()
     await this.ensureLogGroup()
 
-    // Register task definition
     const taskDef = await this.ecs.send(
       new RegisterTaskDefinitionCommand({
         containerDefinitions: [
@@ -191,7 +246,6 @@ export class FargateService {
             environment: [
               { name: 'GEMINI_API_KEY', value: geminiApiKey },
               { name: 'ARENA_DATA_ROOT', value: '/var/lib/arena' },
-              { name: 'ROOM_ID', value: roomId },
             ],
             image: imageUri,
             logConfiguration: {
@@ -199,7 +253,7 @@ export class FargateService {
               options: {
                 'awslogs-group': `/ecs/${this.taskFamily}`,
                 'awslogs-region': this.region,
-                'awslogs-stream-prefix': serviceName,
+                'awslogs-stream-prefix': this.taskFamily,
               },
             },
             name: 'arena-container',
@@ -225,7 +279,21 @@ export class FargateService {
     if (!taskDefinitionArn) {
       throw new Error('Failed to register task definition')
     }
-    this.logger.log({ action: 'deployRoom.taskDefRegistered', taskDefinitionArn })
+    this.logger.log({ action: 'registerTaskDefinition.success', taskDefinitionArn })
+    return taskDefinitionArn
+  }
+
+  /**
+   * Deploys a container to Fargate for a specific room.
+   * Returns the public URL pointing to arena.html.
+   */
+  async deployRoom(
+    roomId: string,
+    taskDefinitionArn: string,
+    securityGroupId: string,
+  ): Promise<DeployResult> {
+    this.logger.log({ action: 'deployRoom.start', roomId, taskDefinitionArn })
+    const serviceName = `arena-room-${roomId.slice(0, 8)}`
 
     const subnets = await this.getDefaultSubnets()
 
@@ -238,6 +306,7 @@ export class FargateService {
         networkConfiguration: {
           awsvpcConfiguration: {
             assignPublicIp: 'ENABLED',
+            securityGroups: [securityGroupId],
             subnets,
           },
         },
@@ -359,13 +428,29 @@ export class FargateService {
   }
 
   /**
-   * Gets or creates the ecsTaskExecutionRole ARN.
-   * Uses the AWS-managed AmazonECSTaskExecutionRolePolicy.
+   * Gets the ecsTaskExecutionRole ARN.
+   * Tries IAM GetRole first; falls back to constructing the ARN from the account ID.
+   * The role must exist (create it manually or via IaC if missing).
    */
   private async getOrCreateExecutionRoleArn(): Promise<string> {
-    // Use the standard role; it should be created via IAM or will be auto-created
+    const roleName = 'ecsTaskExecutionRole'
+
+    try {
+      const { IAMClient, GetRoleCommand } = await import('@aws-sdk/client-iam')
+      const iam = new IAMClient({ region: this.region })
+      const existing = await iam.send(new GetRoleCommand({ RoleName: roleName }))
+      if (existing.Role?.Arn) {
+        this.logger.log({ action: 'getOrCreateExecutionRole.exists', arn: existing.Role.Arn })
+        return existing.Role.Arn
+      }
+    } catch {
+      // IAM permission may not be available; fall back to constructing the ARN
+    }
+
     const accountId = await this.getAccountId()
-    return `arn:aws:iam::${accountId}:role/ecsTaskExecutionRole`
+    const arn = `arn:aws:iam::${accountId}:role/${roleName}`
+    this.logger.log({ action: 'getOrCreateExecutionRole.fallbackArn', arn })
+    return arn
   }
 
   private async getAccountId(): Promise<string> {
