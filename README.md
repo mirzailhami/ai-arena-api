@@ -7,7 +7,7 @@ Backend service for the AI Arena — problem library, tournament bracket generat
 - TypeScript / NestJS 11
 - PostgreSQL / Prisma 7
 - pnpm 10
-- AWS SDK v3 (ECS, ECR, EC2, CloudWatch Logs, STS)
+- AWS SDK v3 (ECS, ECR, EC2, CloudWatch Logs, STS, IAM)
 - `@nestjs/schedule` (cron-based publishing timer)
 - `@nestjs/event-emitter` (internal event bus)
 
@@ -69,7 +69,7 @@ ARENA_SOURCE_DIR=<path-to-ai-arena-develop-folder>
 | `ECR_REPOSITORY_NAME` | ECR repo name for arena Docker images |
 | `ECS_CLUSTER_NAME` | ECS cluster name for running Fargate tasks |
 | `CONTAINER_PORT` | Port exposed by the arena container (default: `8080`) |
-| `GEMINI_API_KEY` | API key passed to arena containers as env var |
+| `GEMINI_API_KEY` | *(Optional)* API key passed to arena containers as env var |
 | `ARENA_SOURCE_DIR` | Path to the `ai-arena-develop` folder containing `Dockerfile` and arena source |
 
 ## Local run

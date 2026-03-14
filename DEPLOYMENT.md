@@ -26,7 +26,8 @@ Step-by-step guide for setting up the AI Arena backend with AWS Fargate room pro
    - `AmazonEC2ContainerRegistryFullAccess`
    - `AmazonVPCReadOnlyAccess`
    - `CloudWatchLogsFullAccess`
-5. Create an **Access Key** (CLI use case)
+5. Additionally, ensure the user has `sts:GetCallerIdentity` permission (included in most default policies)
+6. Create an **Access Key** (CLI use case)
 6. Save the Access Key ID and Secret Access Key
 
 ### 1.2 Verify Default VPC
@@ -42,15 +43,26 @@ If no default VPC exists, create one:
 aws ec2 create-default-vpc
 ```
 
-### 1.3 Auto-Created Resources
+### 1.3 Create ECS Task Execution Role
+
+The IAM deployer user typically lacks `iam:CreateRole` permissions, so this role must be created manually:
+
+1. Navigate to **IAM → Roles → Create role**
+2. Trusted entity type: **AWS service**
+3. Use case: **Elastic Container Service → Elastic Container Service Task**
+4. Role name: `ecsTaskExecutionRole`
+5. Attach managed policy: `AmazonECSTaskExecutionRolePolicy`
+6. Create the role
+
+The trust policy should allow `ecs-tasks.amazonaws.com` to assume the role (this is set automatically when choosing the ECS Task use case above).
+
+### 1.4 Auto-Created Resources
 
 The backend automatically creates these AWS resources on first use:
 - **ECR Repository** (`ai-arena`) — stores the arena Docker image
 - **ECS Cluster** (`ai-arena-cluster`) — runs Fargate tasks
 - **CloudWatch Log Group** (`/ecs/ai-arena-room`) — collects container logs
-- **ECS Task Execution Role** (`ecsTaskExecutionRole`) — allows ECS to pull images and write logs
-
-No manual resource creation is needed beyond the IAM user.
+- **Security Group** (`ai-arena-fargate-sg`) — allows inbound traffic on port 8080
 
 ---
 
@@ -95,7 +107,7 @@ ECS_TASK_FAMILY=ai-arena-room
 CONTAINER_PORT=8080
 
 # Arena container environment
-GEMINI_API_KEY=<your-gemini-api-key>
+GEMINI_API_KEY=           # optional — passed to arena containers
 
 # Path to the ai-arena-develop folder (contains Dockerfile for arena WAR)
 ARENA_SOURCE_DIR=/path/to/ai-arena-develop/ai-arena-develop
@@ -210,7 +222,7 @@ Access at `https://local.topcoder-dev.com/arena-manager/ai-hub`
 
 - Check CloudWatch logs: AWS Console → CloudWatch → Log groups → `/ecs/ai-arena-room`
 - Verify the arena Docker image builds locally: `docker build -t ai-arena <ARENA_SOURCE_DIR>`
-- Ensure `GEMINI_API_KEY` is set (the arena container may require it)
+- If the arena container needs a Gemini key, ensure `GEMINI_API_KEY` is set in `.env`
 
 ### No public IP assigned
 
@@ -244,7 +256,7 @@ Access at `https://local.topcoder-dev.com/arena-manager/ai-hub`
 
 - All API endpoints are JWT-protected (Topcoder Auth0 tokens)
 - AWS credentials are stored in `.env` only (gitignored)
-- Fargate tasks run in public subnets with security groups allowing inbound on the container port
+- Fargate tasks run in public subnets with a dedicated security group (`ai-arena-fargate-sg`) allowing inbound on port 8080
 - The task execution role has minimal permissions (ECR pull + CloudWatch logs)
 
 ### Cost Considerations
