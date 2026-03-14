@@ -150,6 +150,38 @@ The backend auto-creates:
 - CloudWatch log group (if not exists)
 - ECS task execution role (if not exists)
 
+## Smoke Test
+
+An automated end-to-end smoke test script is included. It creates tournaments, assigns problems, publishes, verifies rooms, tests the AI Hub endpoint, and validates error handling (409/404).
+
+### Prerequisites
+
+- API running (`pnpm start:dev`)
+- PostgreSQL running (`docker compose up -d postgres`)
+- At least 1 problem uploaded and flagged as contest-ready
+
+### Reset DB (optional — keeps problems)
+
+```bash
+docker exec ai-arena-postgres psql -U postgres -d ai_arena_api \
+  -c "DELETE FROM rooms; DELETE FROM tournaments;"
+```
+
+### Run
+
+```bash
+bash scripts/smoke-test.sh
+```
+
+The script prints pass/fail for each check and a summary at the end. After completion, the cron scheduler (runs every 60s) will deploy rooms to AWS Fargate. Monitor with:
+
+```bash
+curl -s http://localhost:3008/v6/tourney/<tourneyId>/rooms \
+  -H 'Authorization: Bearer test' | python3 -m json.tool
+```
+
+Rooms transition: `PENDING` → `DEPLOYING` → `RUNNING` (with public URL) → `STOPPED`.
+
 ## Notes
 
 - Authentication currently only enforces that a request carries either a bearer token or a session header.
