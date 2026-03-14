@@ -156,3 +156,4 @@ The backend auto-creates:
 - Role-based restriction points are intentionally left as TODO comments per challenge requirements.
 - Problem validation requires Docker to be installed and available on the host machine.
 - Only one tournament can be active (PUBLISHED or IN_PROGRESS) at a time.
+- The first arena Docker image build may take several minutes (the image is cached after the initial build). During this time the API may be temporarily unresponsive because the build runs synchronously. Subsequent deployments reuse the cached image and complete quickly.
