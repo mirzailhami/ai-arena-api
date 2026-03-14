@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common'
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common'
 import { Prisma, Tournament } from '@prisma/client'
 import { randomUUID } from 'crypto'
 
@@ -380,12 +384,10 @@ export class TournamentsService {
       where: { id: tourneyId },
     })
     if (!tournament) {
-      return responseOf(null, false, `Tournament ID ${tourneyId} not found.`)
+      throw new NotFoundException(`Tournament ID ${tourneyId} not found.`)
     }
     if (tournament.status !== 'DRAFT') {
-      return responseOf(
-        null,
-        false,
+      throw new ConflictException(
         `Tournament is already ${tournament.status.toLowerCase()}.`,
       )
     }
@@ -398,9 +400,7 @@ export class TournamentsService {
       },
     })
     if (existing) {
-      return responseOf(
-        null,
-        false,
+      throw new ConflictException(
         `Another tournament ("${existing.name}") is already active. Only one active tournament is allowed.`,
       )
     }

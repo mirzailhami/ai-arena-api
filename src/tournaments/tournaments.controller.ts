@@ -56,6 +56,13 @@ export class TournamentsController {
     return this.tournamentsService.listTournaments()
   }
 
+  @Get('active/hub')
+  getActiveTournament(): Promise<
+    ResponseObject<(TournamentDto & { rooms: RoomDto[] }) | null>
+  > {
+    return this.tournamentsService.getActiveTournament()
+  }
+
   @Get(':tourneyId')
   getTournament(
     @Param('tourneyId') tourneyId: string,
@@ -82,12 +89,5 @@ export class TournamentsController {
     @Param('tourneyId') tourneyId: string,
   ): Promise<ResponseObject<RoomDto[]>> {
     return this.tournamentsService.getRooms(tourneyId)
-  }
-
-  @Get('active/hub')
-  getActiveTournament(): Promise<
-    ResponseObject<(TournamentDto & { rooms: RoomDto[] }) | null>
-  > {
-    return this.tournamentsService.getActiveTournament()
   }
 }
