@@ -24,12 +24,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ai_arena_api?schema=public
-      PORT: 3008
       AI_ARENA_API_DATA_ROOT: /app/data
-      ARENA_SYNTHETICA_WAR_PATH: ''
-      CHOKIDAR_USEPOLLING: 'true'
     ports:
       - '3008:3008'
     volumes:
