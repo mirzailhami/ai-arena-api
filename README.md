@@ -148,7 +148,9 @@ The backend auto-creates:
 - ECR repository (if not exists)
 - ECS cluster (if not exists)
 - CloudWatch log group (if not exists)
-- ECS task execution role (if not exists)
+
+**Manual setup required:**
+- ECS task execution role (`ecsTaskExecutionRole`) — must be created manually in IAM Console (trusted entity: ECS Tasks, attach `AmazonECSTaskExecutionRolePolicy`)
 
 ## Smoke Test
 
